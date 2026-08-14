@@ -1,0 +1,25 @@
+{
+  "name": "inspect-css",
+  "version": "0.1.0",
+  "description": "An open-source visual CSS editor that runs on any website. Hover to highlight, click to select, edit design properties live, and copy clean generated CSS.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "dev": "node scripts/build.mjs --watch --serve",
+    "bookmarklet": "node scripts/bookmarklet.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  },
+  "keywords": [
+    "css",
+    "editor",
+    "visual",
+    "inspector",
+    "devtools",
+    "bookmarklet",
+    "browser-extension"
+  ]
+}
