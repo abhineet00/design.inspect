@@ -137,27 +137,32 @@ ${fontFace}
 .ibtn.active { background: var(--field-active); }
 .ibtn svg { width: 16px; height: 16px; }
 
-/* ---------- Spacing box ---------- */
-.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 27px 41px; position: relative; }
-.boxeditor .ring { border-radius: 12px; padding: 27px 41px; position: relative; }
-.boxeditor .ring.pad { background: var(--box-content); }
-.boxeditor .tag { position: absolute; top: 6px; left: 12px; font-size: 10px; color: var(--muted); font-weight: 500; z-index: 1; }
-.boxeditor .center-size {
-  background: var(--box-content); border-radius: 10px;
-  padding: 18px 8px; text-align: center; color: var(--text); font-size: 15px;
-  display: flex; align-items: center; justify-content: center; gap: 6px; position: relative;
+/* ---------- Spacing box (3 nested boxes, exact colors from design) ---------- */
+.sp-box {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  padding: 8px; position: relative; width: 100%;
 }
-.boxeditor .center-size .tag { position: absolute; top: 6px; left: 8px; }
-.boxeditor .edge {
-  position: absolute; width: 42px; text-align: center; background: transparent;
-  border: none; color: var(--text); font-size: 15px; font-family: var(--font); outline: none; z-index: 2;
+.sp-margin  { background: var(--field);       border-radius: 24px; }
+.sp-padding { background: var(--box-margin);   border-radius: 16px; }
+.sp-size {
+  background: var(--box-content); border-radius: 12px; padding: 18px 10px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  color: var(--text); font-size: 15px; position: relative; flex: 1 0 0; min-height: 60px;
 }
-.boxeditor .edge:focus { color: var(--blue); }
+.sp-mid { display: flex; align-items: center; gap: 8px; width: 100%; }
+.sp-tag { position: absolute; top: 6px; left: 10px; font-size: 10px; color: var(--muted); font-weight: 500; z-index: 1; }
+.sp-x { color: var(--muted); }
+.sp-edge {
+  width: 34px; text-align: center; background: transparent; border: none;
+  color: var(--text); font-size: 15px; font-family: var(--font); outline: none; flex: none;
+}
+.sp-edge:focus { color: var(--blue); }
 
 /* ---------- Corner grid (Appearance) ---------- */
 .corner-mix { display: grid; grid-template-columns: 1fr 34px; gap: 4px; }
-.corner-mix .ibtn { height: 34px; }
+.corner-mix .ibtn { height: 34px; background: var(--field-active); }
 .corner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.corner-grid .field { background: var(--field-2); }
 
 /* ---------- Fill / stroke add rows ---------- */
 .addrow { display: flex; align-items: center; justify-content: space-between; height: 20px; }

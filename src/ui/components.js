@@ -117,49 +117,34 @@ export function labeled(label, node) {
   return h('div', { class: 'stack' }, [h('span', { class: 'label', text: label }), node]);
 }
 
-/** The margin/padding box editor with the nested "Margin / Padding / Size" rings. */
+/**
+ * The margin/padding box editor. Three nested boxes exactly as in the design:
+ *   Margin  (outer, rgba(35,35,35,.4), r24)
+ *   Padding (middle, #1b1b1b, r16)
+ *   Size    (inner, #0b0b0b, r12)
+ * Each box has a corner label and editable top/left/right/bottom edge values.
+ */
 export function spacingBox(sides, onChange) {
-  const mk = (kind, side, val, cls) => {
-    const inp = h('input', { class: 'edge ' + cls, value: parseLength(val).value });
+  const edge = (kind, side) => {
+    const inp = h('input', { class: 'sp-edge', value: parseLength(sides[kind][side]).value });
     inp.addEventListener('change', () => {
       const raw = inp.value.trim();
       onChange(`${kind}-${side}`, /^-?[\d.]+$/.test(raw) ? raw + 'px' : raw);
     });
     return inp;
   };
-  const positions = {
-    top: 'top:2px;left:50%;transform:translateX(-50%)',
-    bottom: 'bottom:2px;left:50%;transform:translateX(-50%)',
-    left: 'left:2px;top:50%;transform:translateY(-50%)',
-    right: 'right:2px;top:50%;transform:translateY(-50%)',
-  };
-  const place = (el, pos) => { el.setAttribute('style', positions[pos]); return el; };
+  const box = (kind, cls, label, inner) =>
+    h('div', { class: cls }, [
+      h('span', { class: 'sp-tag', text: label }),
+      edge(kind, 'top'),
+      h('div', { class: 'sp-mid' }, [edge(kind, 'left'), inner, edge(kind, 'right')]),
+      edge(kind, 'bottom'),
+    ]);
 
-  const marginEdges = ['top', 'bottom', 'left', 'right'].map((s) =>
-    place(mk('margin', s, sides.margin[s], 'm-' + s), s));
-  const padPos = {
-    top: 'top:2px;left:50%;transform:translateX(-50%)',
-    bottom: 'bottom:2px;left:50%;transform:translateX(-50%)',
-    left: 'left:2px;top:50%;transform:translateY(-50%)',
-    right: 'right:2px;top:50%;transform:translateY(-50%)',
-  };
-  const padEdges = ['top', 'bottom', 'left', 'right'].map((s) => {
-    const el = mk('padding', s, sides.padding[s], 'p-' + s);
-    el.setAttribute('style', padPos[s]);
-    return el;
-  });
-
-  const sizeBox = h('div', { class: 'center-size' }, [
-    h('span', { class: 'tag', text: 'Size' }),
-    h('span', { text: parseLength(sides.width || '0').value + ' × ' + parseLength(sides.height || '0').value }),
+  const sizeBox = h('div', { class: 'sp-size' }, [
+    h('span', { class: 'sp-tag', text: 'Size' }),
+    h('span', { html: `${parseLength(sides.width || '0').value} <span class="sp-x">x</span> ${parseLength(sides.height || '0').value}` }),
   ]);
-  const padRing = h('div', { class: 'ring pad' }, [
-    h('span', { class: 'tag', text: 'Padding' }),
-    ...padEdges, sizeBox,
-  ]);
-  return h('div', { class: 'boxeditor' }, [
-    h('span', { class: 'tag', text: 'Margin' }),
-    ...marginEdges,
-    padRing,
-  ]);
+  const padBox = box('padding', 'sp-box sp-padding', 'Padding', sizeBox);
+  return box('margin', 'sp-box sp-margin', 'Margin', padBox);
 }
