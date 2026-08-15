@@ -65,8 +65,8 @@ export function selectField({ value, options, onChange, iconName, key, sm = true
 }
 
 /** A row of icon toggle buttons (alignment, flips, text-align). */
-export function iconButtons(buttons, { active = -1, grow = false, onPick } = {}) {
-  const row = h('div', { class: 'iconrow' + (grow ? ' grow' : '') });
+export function iconButtons(buttons, { active = -1, grow = false, seg = false, onPick } = {}) {
+  const row = h('div', { class: 'iconrow' + (grow ? ' grow' : '') + (seg ? ' seg' : '') });
   buttons.forEach((b, i) => {
     const btn = h('button', {
       class: 'ibtn' + (i === active ? ' active' : ''),

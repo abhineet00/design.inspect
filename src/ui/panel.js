@@ -75,7 +75,7 @@ export class Panel {
       { icon: 'align-vertical-center', title: 'Center vertically', css: ['align-items', 'center'] },
     ];
     body.append(section('Position', [
-      labeled('Alignment', iconButtons(alignIcons, { grow: true, onPick: (b) => setProp(el, b.css[0], b.css[1]) })),
+      labeled('Alignment', iconButtons(alignIcons, { grow: true, seg: true, onPick: (b) => setProp(el, b.css[0], b.css[1]) })),
       labeled('Position', h('div', { class: 'row' }, [
         field({ key: 'X', value: t.tx + 'px', onChange: (v) => setT({ tx: parseFloat(v) || 0 }) }),
         field({ key: 'Y', value: t.ty + 'px', onChange: (v) => setT({ ty: parseFloat(v) || 0 }) }),
@@ -139,12 +139,10 @@ export class Panel {
       ]),
       h('div', { class: 'corner-grid' }, corners.map((c) =>
         field({ iconName: 'full-screen', value: c.v, showUnit: false, onChange: on(c.prop) }))),
-      labeled('', addRow('Fill', () => on('background-color')('#ffffff'))),
-      m.background.color && m.background.color !== 'rgba(0, 0, 0, 0)'
-        ? colorLine(m.background.color, on('background-color')) : null,
-      labeled('', addRow('Stroke', () => { on('border-style')('solid'); on('border-width')('1px'); on('border-color')('#ffffff'); })),
-      m.border.style !== 'none'
-        ? colorLine(m.border.color, on('border-color')) : null,
+      addRow('Fill', () => { this._fillOpen = !this._fillOpen; this.render(); }),
+      this._fillOpen ? colorLine(m.background.color, on('background-color')) : null,
+      addRow('Stroke', () => { this._strokeOpen = !this._strokeOpen; this.render(); }),
+      this._strokeOpen ? colorLine(m.border.color, on('border-color')) : null,
     ]));
 
     // ----- Typography -----
@@ -167,7 +165,7 @@ export class Panel {
           { icon: 'text-align-center', title: 'Center', css: 'center' },
           { icon: 'text-align-start', title: 'Left', css: 'left' },
           { icon: 'text-align-justify', title: 'Justify', css: 'justify' },
-        ], { grow: true, active: ['right', 'center', 'left', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
+        ], { grow: true, seg: true, active: ['right', 'center', 'left', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
       ]),
     ]));
   }
