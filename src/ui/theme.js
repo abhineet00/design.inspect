@@ -41,7 +41,7 @@ export const css = /* css */ `
 .panel {
   position: fixed;
   top: 20px; right: 20px;
-  width: 340px;
+  width: 320px;
   max-height: calc(100vh - 40px);
   background: var(--panel-bg);
   -webkit-backdrop-filter: blur(18px);
@@ -100,7 +100,7 @@ export const css = /* css */ `
 .field {
   display: flex; align-items: center; gap: 8px;
   background: var(--field); border: 1px solid transparent;
-  border-radius: var(--r-field); padding: 10px 12px; min-width: 0;
+  border-radius: var(--r-field); padding: 8px 10px; min-width: 0;
 }
 .field:focus-within { border-color: var(--blue); }
 .field .fic { width: 16px; height: 16px; color: var(--text); flex: none; opacity: .85; display: grid; place-items: center; }
@@ -124,23 +124,23 @@ export const css = /* css */ `
 .iconrow { display: flex; gap: 8px; }
 .iconrow.grow > * { flex: 1; }
 .ibtn {
-  height: 40px; min-width: 40px; display: grid; place-items: center;
+  height: 36px; min-width: 36px; display: grid; place-items: center;
   background: var(--field); border: 1px solid transparent; border-radius: var(--r-field);
-  color: var(--text); cursor: pointer; padding: 0 8px;
+  color: var(--text); cursor: pointer; padding: 0 6px;
 }
 .ibtn:hover { background: var(--field-2); }
 .ibtn.active { background: var(--field-active); }
-.ibtn svg { width: 20px; height: 20px; }
+.ibtn svg { width: 18px; height: 18px; }
 
 /* ---------- Spacing box ---------- */
 .spacing-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 30px 40px; position: relative; margin-top: 2px; }
-.boxeditor .ring { border-radius: 12px; padding: 28px 40px; position: relative; }
+.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 22px 30px; position: relative; margin-top: 2px; }
+.boxeditor .ring { border-radius: 12px; padding: 20px 30px; position: relative; }
 .boxeditor .ring.pad { background: var(--box-content); border: 1px dashed var(--line); }
-.boxeditor .tag { position: absolute; top: 7px; left: 12px; font-size: 10px; color: var(--muted); font-weight: 400; z-index: 1; }
+.boxeditor .tag { position: absolute; top: 6px; left: 10px; font-size: 10px; color: var(--muted); font-weight: 400; z-index: 1; }
 .boxeditor .center-size {
   background: #000; border: 1px dashed var(--line); border-radius: 10px;
-  padding: 26px 8px; text-align: center; color: var(--text); font-size: 13px;
+  padding: 18px 8px; text-align: center; color: var(--text); font-size: 12px;
   display: flex; align-items: center; justify-content: center; gap: 6px; position: relative;
 }
 .boxeditor .center-size .tag { position: absolute; top: 6px; left: 10px; }
@@ -177,11 +177,11 @@ export const css = /* css */ `
 .empty { color: var(--muted); text-align: center; padding: 32px 16px; font-size: 13px; }
 
 /* ---------- Vertical toolbar dock ---------- */
-.dock { position: fixed; top: 50%; left: 20px; transform: translateY(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 16px; z-index: 2147483646;
-  filter: drop-shadow(5px 4px 6px rgba(0,0,0,.2)); }
+.dock { position: fixed; top: 50%; left: 16px; transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 2147483646;
+  filter: drop-shadow(4px 3px 5px rgba(0,0,0,.2)); }
 .dock-circle {
-  width: 56px; height: 56px; border-radius: 999px; display: grid; place-items: center;
+  width: 40px; height: 40px; border-radius: 999px; display: grid; place-items: center;
   background: var(--tool-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
   border: 1px solid var(--border-soft); color: var(--text); cursor: pointer;
 }
@@ -189,16 +189,16 @@ export const css = /* css */ `
 .dock-group {
   display: flex; flex-direction: column; align-items: center;
   background: var(--tool-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border: 1px solid var(--border-soft); border-radius: var(--r-panel); padding: 4px; gap: 0;
+  border: 1px solid var(--border-soft); border-radius: 20px; padding: 4px; gap: 0;
 }
 .dock-btn {
-  width: 56px; height: 56px; display: grid; place-items: center; border-radius: var(--r-btn);
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: 16px;
   background: transparent; border: none; color: var(--text); cursor: pointer;
 }
 .dock-btn:hover { background: rgba(255,255,255,0.06); }
 .dock-btn.active { background: var(--tool-active); }
-.dock-btn svg, .dock-circle svg { width: 24px; height: 24px; }
-.dock-sep { width: 32px; height: 1px; background: var(--line); margin: 2px 0; }
+.dock-btn svg, .dock-circle svg { width: 18px; height: 18px; }
+.dock-sep { width: 22px; height: 1px; background: var(--line); margin: 1px 0; }
 
 /* toast */
 .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
