@@ -26,6 +26,10 @@ export function readModel(el) {
       height: cs.height,
       x: round(rect.left + window.scrollX),
       y: round(rect.top + window.scrollY),
+      rowGap: cs.rowGap === 'normal' ? '0' : cs.rowGap,
+      columnGap: cs.columnGap === 'normal' ? '0' : cs.columnGap,
+      justify: val(el, cs, 'justify-content'),
+      align: val(el, cs, 'align-items'),
     },
     transform: parseTransform(el, cs),
     spacing: {
@@ -47,6 +51,7 @@ export function readModel(el) {
       letterSpacing: cs.letterSpacing === 'normal' ? '0px' : cs.letterSpacing,
       textAlign: val(el, cs, 'text-align'),
       color: val(el, cs, 'color'),
+      marginBottom: val(el, cs, 'margin-bottom'),
     },
     background: {
       color: val(el, cs, 'background-color'),

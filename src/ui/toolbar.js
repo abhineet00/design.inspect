@@ -1,11 +1,15 @@
-// The bottom dock: brand + tool buttons (pick, panel toggle, clear, close).
+// The vertical dock (left of screen), matching the Figma design: a pause
+// circle on top, a grouped pill of actions in the middle, and a close circle.
+// The component / file-diff / html-file icons switch the panel view.
 
 import { store } from '../core/store.js';
 import { h } from '../core/util.js';
+import { icon } from '../icons/index.js';
 import { clearAll } from '../core/liveStyles.js';
 
 export class Toolbar {
-  constructor(root) {
+  constructor(root, api) {
+    this.api = api;
     this.el = h('div', { class: 'dock', 'data-inspect-ui': '' });
     root.appendChild(this.el);
     this.render();
@@ -14,33 +18,48 @@ export class Toolbar {
 
   render() {
     this.el.innerHTML = '';
-    this.pick = tool('pick', 'Pick element (Esc to stop)', () =>
+
+    // top: pause / resume picking
+    this.pauseBtn = circle('pause', 'Pause / resume picking', () =>
       store.set({ active: !store.get().active }));
-    this.el.append(
-      h('div', { class: 'brand' }, [h('span', { class: 'logo' }), 'InspectCSS']),
-      h('div', { class: 'sep' }),
-      this.pick,
-      tool('panel', 'Show / hide panel', () =>
-        store.set({ collapsed: !store.get().collapsed })),
-      tool('clear', 'Reset all edits', () => clearAll()),
-      h('div', { class: 'sep' }),
-      tool('close', 'Exit InspectCSS', () => window.InspectCSS?.destroy())
-    );
+
+    // grouped pill
+    const group = h('div', { class: 'dock-group' }, [
+      dockBtn('undo-03', 'Undo', () => this.api.undo?.()),
+      dockBtn('redo-01', 'Redo', () => this.api.redo?.()),
+      sep(),
+      dockBtn('layer-bring-forward', 'Bring forward', () => this.api.bump?.(1)),
+      dockBtn('layer-send-backward', 'Send backward', () => this.api.bump?.(-1)),
+      sep(),
+      this.designBtn = dockBtn('component', 'Design', () => store.set({ view: 'design', collapsed: false })),
+      this.codeBtn = dockBtn('file-diff', 'Generated CSS', () => store.set({ view: 'code', collapsed: false })),
+      this.htmlBtn = dockBtn('html-file-01', 'HTML', () => store.set({ view: 'html', collapsed: false })),
+      sep(),
+      dockBtn('laptop-phone-sync', 'Toggle responsive preview', () => this.api.toggleResponsive?.()),
+    ]);
+
+    // bottom: close
+    const close = circle('cancel-01', 'Exit InspectCSS', () => window.InspectCSS?.destroy());
+
+    this.el.append(this.pauseBtn, group, close);
     this.sync();
   }
 
   sync() {
-    if (this.pick) this.pick.classList.toggle('on', store.get().active);
+    const s = store.get();
+    this.pauseBtn?.classList.toggle('active', s.active);
+    this.designBtn?.classList.toggle('active', s.view === 'design');
+    this.codeBtn?.classList.toggle('active', s.view === 'code');
+    this.htmlBtn?.classList.toggle('active', s.view === 'html');
   }
 }
 
-function tool(kind, title, onClick) {
-  return h('button', { class: 'tool', title, onclick: onClick, html: ICONS[kind] });
+function circle(name, title, onClick) {
+  return h('button', { class: 'dock-circle', title, onclick: onClick, html: icon(name) });
 }
-
-const ICONS = {
-  pick: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3l7.5 18 2.5-7.5L20.5 11z"/></svg>',
-  panel: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M14 4v16"/></svg>',
-  clear: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-9 0v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V6"/></svg>',
-  close: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/></svg>',
-};
+function dockBtn(name, title, onClick) {
+  return h('button', { class: 'dock-btn', title, onclick: onClick, html: icon(name) });
+}
+function sep() {
+  return h('div', { class: 'dock-sep' });
+}

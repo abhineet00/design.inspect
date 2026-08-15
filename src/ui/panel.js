@@ -1,11 +1,14 @@
-// The floating inspector panel: header, tabs, and the Design / Code / HTML views.
+// The floating inspector panel. Layout, colors and sections follow the Figma
+// design 1:1. The active view (design / code / html) is driven by the toolbar.
 
 import { store } from '../core/store.js';
 import { h, round, elementLabel } from '../core/util.js';
-import { breadcrumb } from '../core/selector.js';
 import { readModel, composeTransform } from '../core/styleModel.js';
 import { setProp, generateCss, clearAll } from '../core/liveStyles.js';
-import { field, selectField, colorRow, section, spacingBox } from './components.js';
+import { icon } from '../icons/index.js';
+import {
+  field, selectField, iconButtons, colorLine, section, labeled, spacingBox,
+} from './components.js';
 
 export class Panel {
   constructor(root) {
@@ -15,171 +18,174 @@ export class Panel {
     this._drag();
   }
 
-  set(el) {
-    this.selected = el;
-    this.render();
-  }
+  set(el) { this.selected = el; this.render(); }
 
   render() {
     const st = store.get();
-    this.el.classList.toggle('collapsed', st.collapsed);
+    this.el.classList.toggle('hidden', st.collapsed);
     this.el.innerHTML = '';
-    this.el.append(this._head(), this._tabs());
-    if (st.collapsed) return;
+    this.el.append(this._head());
     const body = h('div', { class: 'panel-body' });
     if (!this.selected) {
       body.append(h('div', { class: 'empty', text: 'Pick an element on the page to inspect and edit its styles.' }));
-    } else if (st.tab === 'design') this._design(body);
-    else if (st.tab === 'code') this._code(body);
-    else this._html(body);
+    } else if (st.view === 'code') this._code(body);
+    else if (st.view === 'html') this._html(body);
+    else this._design(body);
     this.el.append(body);
   }
 
+  // ---------------- Header ----------------
   _head() {
     const el = this.selected;
     const m = el ? readModel(el) : null;
-    const actions = h('div', { class: 'head-actions' }, [
-      iconBtn('copy', 'Copy CSS', () => this._copy()),
-      iconBtn('collapse', 'Collapse', () => store.set({ collapsed: !store.get().collapsed })),
-      iconBtn('clear', 'Reset all edits', () => { clearAll(); this.render(); }),
-      iconBtn('close', 'Close', () => window.InspectCSS?.destroy()),
-    ]);
-    return h('div', { class: 'panel-head' }, [
-      h('div', { class: 'head-meta' }, [
+    const crumb = el ? classChain(el) : [];
+    return h('div', { class: 'head' }, [
+      h('div', { class: 'head-top' }, [
         h('div', { class: 'head-title', text: el ? elementLabel(el) || m.tag : 'InspectCSS' }),
-        h('div', { class: 'head-sel', text: el ? breadcrumb(el) : 'no selection' }),
-        el ? h('div', { class: 'head-dims' }, [
-          h('span', { html: `<b>${round(m.rect.width)}×${round(m.rect.height)}</b> px` }),
-          h('span', { html: `A <b>${m.typography.fontSize}</b>` }),
-        ]) : null,
+        h('div', { class: 'head-actions' }, [
+          hbtn('delete02', 'Reset all edits', () => { clearAll(); this.render(); }),
+          hbtn('minimize-screen', 'Collapse panel', () => store.set({ collapsed: true })),
+          hbtn('x', 'Close', () => window.InspectCSS?.destroy()),
+        ]),
       ]),
-      actions,
+      el ? h('div', { class: 'crumb' }, crumb.map((c) => h('span', { text: c }))) : null,
+      el ? h('div', { class: 'dims' }, [
+        h('span', { html: `<b>${round(m.rect.width)}</b> x <b>${round(m.rect.height)}</b> px` }),
+        h('span', { html: `A <b>${parseInt(m.typography.fontSize)}px</b>` }),
+      ]) : h('div', { class: 'crumb', text: 'no selection' }),
     ]);
   }
 
-  _tabs() {
-    const st = store.get();
-    const mk = (id, label, isNew) =>
-      h('button', {
-        class: 'tab' + (st.tab === id ? ' active' : ''),
-        onclick: () => { store.set({ tab: id }); this.render(); },
-      }, [label, isNew ? h('span', { class: 'badge-new', text: 'NEW' }) : null]);
-    return h('div', { class: 'tabs' }, [
-      mk('design', 'Design'),
-      mk('code', 'Code'),
-      mk('html', 'HTML'),
-    ]);
-  }
-
-  // ---------------- Design tab ----------------
+  // ---------------- Design view ----------------
   _design(body) {
     const el = this.selected;
     const m = readModel(el);
-    const on = (prop) => (v) => { setProp(el, prop, v); this._refreshLight(); };
+    const on = (prop) => (v) => setProp(el, prop, v);
 
-    // Media + pseudo context row
-    body.append(
-      selectRow('Media', 'Auto — screen', []),
-      pseudoRow((p) => { store.set({ pseudo: p }); this.render(); })
-    );
-
-    // Position / size / transform
+    // ----- Position -----
     const t = m.transform;
-    const setT = (patch) => {
-      Object.assign(t, patch);
-      const v = composeTransform(t);
-      setProp(el, 'transform', v);
-      this._refreshLight();
-    };
+    const setT = (patch) => { Object.assign(t, patch); setProp(el, 'transform', composeTransform(t)); };
+    const alignIcons = [
+      { icon: 'align-left', title: 'Align left', css: ['text-align', 'left'] },
+      { icon: 'align-horizontal-center', title: 'Center horizontally', css: ['text-align', 'center'] },
+      { icon: 'align-right', title: 'Align right', css: ['text-align', 'right'] },
+      { icon: 'align-top', title: 'Align top', css: ['align-items', 'flex-start'] },
+      { icon: 'align-vertical-center', title: 'Center vertically', css: ['align-items', 'center'] },
+      { icon: 'align-bottom', title: 'Align bottom', css: ['align-items', 'flex-end'] },
+    ];
+    body.append(section('Position', [
+      labeled('Alignment', iconButtons(alignIcons, { grow: true, onPick: (b) => setProp(el, b.css[0], b.css[1]) })),
+      labeled('Position', h('div', { class: 'row' }, [
+        field({ key: 'X', value: t.tx + 'px', onChange: (v) => setT({ tx: parseFloat(v) || 0 }) }),
+        field({ key: 'Y', value: t.ty + 'px', onChange: (v) => setT({ ty: parseFloat(v) || 0 }) }),
+      ])),
+      labeled('Rotation', h('div', { class: 'row-3' }, [
+        field({ iconName: 'rotate01', value: t.rotate + '', showUnit: false, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
+        iconButtons([{ icon: 'image-flip-horizontal', title: 'Flip horizontal' }], { onPick: () => flip(el, 'x') }),
+        iconButtons([{ icon: 'image-flip-vertical', title: 'Flip vertical' }], { onPick: () => flip(el, 'y') }),
+      ])),
+    ]));
+
+    // ----- Layout -----
     body.append(section('Layout', [
-      h('div', { class: 'grid-3' }, [
-        field('X', t.tx + 'px', (v) => setT({ tx: parseFloat(v) || 0 })),
-        field('Y', t.ty + 'px', (v) => setT({ ty: parseFloat(v) || 0 })),
-        field('∠', t.rotate + '', (v) => setT({ rotate: parseFloat(v) || 0 }), { unit: false }),
+      labeled('Size', h('div', { class: 'row' }, [
+        field({ key: 'W', value: m.layout.width, onChange: on('width') }),
+        field({ key: 'H', value: m.layout.height, onChange: on('height') }),
+      ])),
+      labeled('Display', selectField({
+        value: m.layout.display,
+        options: ['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'none'],
+        onChange: on('display'),
+      })),
+      h('div', { class: 'row' }, [
+        labeled('Row Gap', field({ iconName: 'vertical-resize', value: m.layout.rowGap, showUnit: false, onChange: on('row-gap') })),
+        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, onChange: on('column-gap') })),
       ]),
-      h('div', { class: 'grid-3', style: { marginTop: '8px' } }, [
-        field('W', m.layout.width, on('width')),
-        field('H', m.layout.height, on('height')),
-        field('R', m.radius.all, on('border-radius')),
-      ]),
-      h('div', { class: 'grid', style: { marginTop: '8px' } }, [
-        selectField('display', m.layout.display,
-          ['block', 'inline', 'inline-block', 'flex', 'inline-flex', 'grid', 'none'], on('display')),
-        selectField('position', m.layout.position,
-          ['static', 'relative', 'absolute', 'fixed', 'sticky'], on('position')),
+      h('div', { class: 'row' }, [
+        labeled('Horizontal Align', selectField({ value: m.layout.justify, options: [['flex-start', 'Start'], ['center', 'Center'], ['flex-end', 'End'], ['space-between', 'Between']], onChange: on('justify-content') })),
+        labeled('Vertical Align', selectField({ value: m.layout.align, options: [['flex-start', 'Start'], ['center', 'Center'], ['flex-end', 'End'], ['stretch', 'Stretch']], onChange: on('align-items') })),
       ]),
     ]));
 
-    // Spacing
+    // ----- Spacing -----
     body.append(section('Spacing', [
-      spacingBox(m.spacing, (prop, v) => { setProp(el, prop, v); this._refreshLight(); }),
+      labeled('Padding', h('div', { class: 'row' }, [
+        field({ iconName: 'horizontal-resize', value: m.spacing.padding.left, onChange: (v) => { on('padding-left')(v); on('padding-right')(v); } }),
+        field({ iconName: 'vertical-resize', value: m.spacing.padding.top, onChange: (v) => { on('padding-top')(v); on('padding-bottom')(v); } }),
+      ])),
+      labeled('Margin', h('div', { class: 'row' }, [
+        field({ iconName: 'horizontal-resize', value: m.spacing.margin.left, onChange: (v) => { on('margin-left')(v); on('margin-right')(v); } }),
+        field({ iconName: 'vertical-resize', value: m.spacing.margin.top, onChange: (v) => { on('margin-top')(v); on('margin-bottom')(v); } }),
+      ])),
+      spacingBox(m.spacing, (prop, v) => setProp(el, prop, v)),
     ]));
 
-    // Typography
+    // ----- Appearance -----
+    const corners = [
+      { key: 'tl', prop: 'border-top-left-radius', v: m.radius.tl },
+      { key: 'tr', prop: 'border-top-right-radius', v: m.radius.tr },
+      { key: 'bl', prop: 'border-bottom-left-radius', v: m.radius.bl },
+      { key: 'br', prop: 'border-bottom-right-radius', v: m.radius.br },
+    ];
+    body.append(section('Appearance', [
+      h('div', { class: 'row' }, [
+        labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
+        labeled('Corner', field({ iconName: 'vector', value: m.radius.all, onChange: on('border-radius') })),
+      ]),
+      h('div', { class: 'corner-grid' }, corners.map((c) =>
+        field({ iconName: 'vector', value: c.v, onChange: on(c.prop) }))),
+      labeled('', addRow('Fill', () => on('background-color')('#ffffff'))),
+      m.background.color && m.background.color !== 'rgba(0, 0, 0, 0)'
+        ? colorLine(m.background.color, on('background-color')) : null,
+      labeled('', addRow('Stroke', () => { on('border-style')('solid'); on('border-width')('1px'); on('border-color')('#ffffff'); })),
+      m.border.style !== 'none'
+        ? colorLine(m.border.color, on('border-color')) : null,
+    ]));
+
+    // ----- Typography -----
     body.append(section('Typography', [
-      h('div', { class: 'grid' }, [
-        field('Size', m.typography.fontSize, on('font-size')),
-        selectField('Weight', String(m.typography.fontWeight),
-          ['100','200','300','400','500','600','700','800','900'], on('font-weight')),
+      labeled('Typeface', selectField({ value: firstFont(m.typography.fontFamily),
+        options: [firstFont(m.typography.fontFamily), 'Quicksand', 'Inter', 'Arial', 'Georgia', 'system-ui', 'monospace'],
+        onChange: on('font-family') })),
+      h('div', { class: 'row' }, [
+        selectField({ value: weightName(m.typography.fontWeight), options: [['300', 'Light'], ['400', 'Regular'], ['500', 'Medium'], ['600', 'SemiBold'], ['700', 'Bold'], ['800', 'Extra']], onChange: on('font-weight') }),
+        selectField({ value: parseInt(m.typography.fontSize) + '', options: ['10', '12', '13', '14', '16', '18', '20', '24', '32', '48'].map((x) => [x, x]), onChange: (v) => on('font-size')(v + 'px') }),
       ]),
-      h('div', { class: 'grid', style: { marginTop: '8px' } }, [
-        field('Line', m.typography.lineHeight === 'normal' ? '1.4' : m.typography.lineHeight, on('line-height'), { unit: false }),
-        field('Spacing', m.typography.letterSpacing, on('letter-spacing')),
+      h('div', { class: 'row' }, [
+        labeled('Line Height', field({ iconName: 'expand-paragraph', value: normalizeLine(m.typography.lineHeight), showUnit: false, onChange: on('line-height') })),
+        labeled('Letter Spacing', field({ iconName: 'letter-spacing', value: m.typography.letterSpacing, showUnit: false, onChange: on('letter-spacing') })),
       ]),
-      h('div', { style: { marginTop: '8px' } }, [
-        selectField('Align', m.typography.textAlign,
-          ['left', 'center', 'right', 'justify'], on('text-align')),
-      ]),
-      h('div', { style: { marginTop: '8px' } }, [colorRow('color', m.typography.color, on('color'))]),
-    ]));
-
-    // Fill & border
-    body.append(section('Fill & Border', [
-      colorRow('background', m.background.color, on('background-color')),
-      colorRow('border', m.border.color, on('border-color')),
-      h('div', { class: 'grid' }, [
-        field('Border', m.border.width, on('border-width')),
-        selectField('Style', m.border.style,
-          ['none', 'solid', 'dashed', 'dotted', 'double'], on('border-style')),
+      h('div', { class: 'row' }, [
+        labeled('Paragraph Spacing', field({ iconName: 'paragraph-spacing', value: parseLenSafe(m.typography.marginBottom), onChange: on('margin-bottom') })),
+        labeled('Alignment', iconButtons([
+          { icon: 'text-align-start', title: 'Left', css: 'left' },
+          { icon: 'text-align-center', title: 'Center', css: 'center' },
+          { icon: 'text-align-right', title: 'Right', css: 'right' },
+          { icon: 'text-align-justify', title: 'Justify', css: 'justify' },
+        ], { grow: true, active: ['left', 'center', 'right', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
       ]),
     ]));
-
-    // Effects
-    body.append(section('Effects', [
-      field('Opacity', m.effects.opacity, on('opacity'), { unit: false }),
-      h('div', { style: { marginTop: '8px' } }, [
-        field('Shadow', m.effects.boxShadow, on('box-shadow'), { unit: false }),
-      ]),
-    ], { open: false }));
   }
 
-  // Re-read only the header dims without rebuilding inputs (keeps focus).
-  _refreshLight() {
-    store.get().panelDirty = true;
-  }
-
-  // ---------------- Code tab ----------------
+  // ---------------- Code view ----------------
   _code(body) {
     const cssText = generateCss();
     body.append(
-      h('div', { class: 'code-actions' }, [
+      h('div', { class: 'view-actions' }, [
         h('button', { class: 'btn primary', text: 'Copy CSS', onclick: () => this._copy() }),
         h('button', { class: 'btn', text: 'Reset', onclick: () => { clearAll(); this.render(); } }),
       ]),
-      cssText
-        ? h('pre', { class: 'code', html: highlight(cssText) })
-        : h('div', { class: 'empty', text: 'No edits yet. Change a property in the Design tab and the generated CSS appears here.' })
+      cssText ? h('pre', { class: 'code', html: highlight(cssText) })
+              : h('div', { class: 'empty', text: 'No edits yet. Change a property in the Design view and the generated CSS appears here.' })
     );
   }
 
-  // ---------------- HTML tab ----------------
   _html(body) {
     const el = this.selected;
     if (!el) return body.append(h('div', { class: 'empty', text: 'No element selected.' }));
     const clone = el.cloneNode(false);
     clone.removeAttribute('data-inspect-id');
-    const open = clone.outerHTML.replace(/></, '>\n  ...\n<');
-    body.append(h('pre', { class: 'code', html: escapeHtml(open) }));
+    body.append(h('pre', { class: 'code', html: escapeHtml(clone.outerHTML.replace(/></, '>\n  …\n<')) }));
   }
 
   _copy() {
@@ -187,26 +193,17 @@ export class Panel {
     if (!text) return;
     navigator.clipboard?.writeText(text).then(() => this._toast('CSS copied'));
   }
-
   _toast(msg) {
-    const t = h('div', {
-      'data-inspect-ui': '', text: msg,
-      style: {
-        position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-        background: '#4c8dff', color: '#fff', padding: '8px 16px', borderRadius: '8px',
-        fontSize: '13px', zIndex: '2147483647', boxShadow: '0 6px 20px rgba(0,0,0,.4)',
-      },
-    });
+    const t = h('div', { class: 'toast', 'data-inspect-ui': '', text: msg });
     this.root.appendChild(t);
     setTimeout(() => t.remove(), 1400);
   }
 
-  // Drag the panel by its header.
   _drag() {
     let sx, sy, ox, oy, dragging = false;
     this.el.addEventListener('mousedown', (e) => {
-      const head = e.target.closest('.panel-head');
-      if (!head || e.target.closest('.icon-btn')) return;
+      const head = e.target.closest('.head');
+      if (!head || e.target.closest('.hbtn')) return;
       dragging = true;
       const r = this.el.getBoundingClientRect();
       sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
@@ -220,56 +217,43 @@ export class Panel {
       this.el.style.left = ox + (e.clientX - sx) + 'px';
       this.el.style.top = Math.max(0, oy + (e.clientY - sy)) + 'px';
     };
-    const up = () => {
-      dragging = false;
-      document.removeEventListener('mousemove', move, true);
-      document.removeEventListener('mouseup', up, true);
-    };
+    const up = () => { dragging = false; document.removeEventListener('mousemove', move, true); document.removeEventListener('mouseup', up, true); };
   }
 }
 
-// --- helpers ---
-function iconBtn(kind, title, onClick) {
-  return h('button', { class: 'icon-btn', title, onclick: onClick, html: ICONS[kind] || '' });
+// ---- helpers ----
+function hbtn(name, title, onClick) {
+  return h('button', { class: 'hbtn', title, onclick: onClick, html: icon(name) });
 }
-
-function selectRow(label, value) {
-  return h('div', { class: 'selectrow' }, [
-    h('label', { html: `${ICONS.media} ${label}` }),
-    h('select', {}, [h('option', { text: value, selected: true })]),
+function addRow(label, onAdd) {
+  return h('div', { class: 'addrow' }, [
+    h('span', { class: 'k', text: label }),
+    h('button', { class: 'addbtn', title: 'Add ' + label, html: icon('plus'), onclick: onAdd }),
   ]);
 }
-
-function pseudoRow(onChange) {
-  const st = store.get();
-  const sel = h('select', {}, ['none', 'hover', 'focus', 'active'].map((p) => {
-    const o = h('option', { value: p, text: p === 'none' ? 'None' : ':' + p });
-    if (p === st.pseudo) o.selected = true;
-    return o;
-  }));
-  sel.addEventListener('change', () => onChange(sel.value));
-  return h('div', { class: 'selectrow' }, [
-    h('label', { html: `${ICONS.state} State or pseudo` }),
-    sel,
-  ]);
+function classChain(el) {
+  const out = [];
+  let node = el, depth = 0;
+  while (node && node.nodeType === 1 && node !== document.documentElement && depth < 3) {
+    if (node.classList.length) out.unshift('.' + node.classList[0]);
+    else out.unshift(node.tagName.toLowerCase());
+    node = node.parentElement; depth++;
+  }
+  return out;
 }
-
-function escapeHtml(s) {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+function flip(el, axis) {
+  const cs = getComputedStyle(el);
+  const cur = cs.transform === 'none' ? '' : cs.transform + ' ';
+  setProp(el, 'transform', cur + (axis === 'x' ? 'scaleX(-1)' : 'scaleY(-1)'));
 }
-
+function firstFont(ff) { return (ff || '').split(',')[0].replace(/["']/g, '').trim() || 'system-ui'; }
+function weightName(w) { return String(w); }
+function normalizeLine(lh) { return lh === 'normal' ? '1.4' : lh; }
+function parseLenSafe(v) { return v && v !== 'auto' ? v : '0px'; }
+function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function highlight(css) {
   return escapeHtml(css)
     .replace(/^([^{\n]+)\{/gm, '<span class="sel">$1</span>{')
     .replace(/^(\s+)([\w-]+)(:)/gm, '$1<span class="prop">$2</span>$3')
     .replace(/: ([^;]+);/g, ': <span class="val">$1</span>;');
 }
-
-const ICONS = {
-  media: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>',
-  state: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/></svg>',
-  copy: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
-  collapse: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14"/></svg>',
-  clear: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m-9 0v14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V6"/></svg>',
-  close: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>',
-};

@@ -1,138 +1,164 @@
-// Reusable panel control widgets. Each returns a DOM node and calls back
-// with the new CSS value when the user edits it.
+// Reusable panel widgets, styled to the Figma design. Each returns a DOM node
+// and calls back with the new CSS value when edited.
 
 import { h, parseLength, rgbToHex, hexToRgba } from '../core/util.js';
+import { icon } from '../icons/index.js';
 
-/** A labelled numeric/text field with an editable unit, e.g.  W [200] px */
-export function field(label, value, onChange, opts = {}) {
-  const { unit: showUnit = true } = opts;
-  const { value: num, unit } = parseLength(value);
-  const input = h('input', {
-    value: num,
-    type: 'text',
-    inputmode: 'decimal',
-    'aria-label': label,
-  });
-  const u = h('span', { class: 'u', text: unit || (showUnit ? 'px' : '') });
+function ico(name) {
+  return h('span', { class: 'fic', html: icon(name) });
+}
+function chevMini() {
+  return h('span', { class: 'chev-mini', html: icon('chevron-down') });
+}
 
-  function commit() {
+/** Field with a leading key (letter or icon) and an optional unit. */
+export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true }) {
+  const parsed = parseLength(value);
+  const input = h('input', { value: parsed.value, type: 'text', inputmode: 'decimal' });
+  const unitEl = showUnit ? h('span', { class: 'unit', text: parsed.unit || unit }) : null;
+
+  const commit = () => {
     const raw = input.value.trim();
     if (raw === '') return onChange('');
     const numeric = /^-?[\d.]+$/.test(raw);
-    onChange(numeric && showUnit ? raw + (u.textContent || 'px') : raw);
-  }
+    onChange(numeric && showUnit ? raw + (unitEl?.textContent || unit) : raw);
+  };
   input.addEventListener('change', commit);
   input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') { input.blur(); }
-    // arrow-key nudge
+    if (e.key === 'Enter') return input.blur();
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const cur = parseFloat(input.value) || 0;
-      input.value = cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1);
-      commit();
-      e.preventDefault();
+      input.value = +(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)).toFixed(2);
+      commit(); e.preventDefault();
     }
   });
-  // cycle common units on unit-click
-  if (showUnit) {
+  if (showUnit && unitEl) {
     const units = ['px', '%', 'em', 'rem', 'vw', 'vh'];
-    u.style.cursor = 'pointer';
-    u.addEventListener('click', () => {
-      const i = units.indexOf(u.textContent);
-      u.textContent = units[(i + 1) % units.length];
+    unitEl.style.cursor = 'pointer';
+    unitEl.addEventListener('click', () => {
+      unitEl.textContent = units[(units.indexOf(unitEl.textContent) + 1) % units.length];
       commit();
     });
   }
   return h('div', { class: 'field' }, [
-    h('span', { class: 'k', text: label }),
+    iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null),
     input,
-    showUnit ? u : null,
+    unitEl,
   ]);
 }
 
-/** A labelled <select>. options: [[value,label], ...] */
-export function selectField(label, value, options, onChange) {
-  const sel = h('select', { 'aria-label': label });
+/** A <select> styled as a field, with the design's chevron. */
+export function selectField({ value, options, onChange, iconName, key }) {
+  const sel = h('select', {});
   for (const opt of options) {
     const [v, l] = Array.isArray(opt) ? opt : [opt, opt];
     const o = h('option', { value: v, text: l });
-    if (v === value) o.selected = true;
+    if (String(v) === String(value)) o.selected = true;
     sel.appendChild(o);
   }
   sel.addEventListener('change', () => onChange(sel.value));
-  return h('div', { class: 'field' }, [h('span', { class: 'k', text: label }), sel]);
+  return h('div', { class: 'field select-like' }, [
+    iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null),
+    sel,
+    chevMini(),
+  ]);
 }
 
-/** Color row with swatch, native picker and hex input. */
-export function colorRow(label, value, onChange) {
+/** A row of icon toggle buttons (alignment, flips, text-align). */
+export function iconButtons(buttons, { active = -1, grow = false, onPick } = {}) {
+  const row = h('div', { class: 'iconrow' + (grow ? ' grow' : '') });
+  buttons.forEach((b, i) => {
+    const btn = h('button', {
+      class: 'ibtn' + (i === active ? ' active' : ''),
+      title: b.title || '',
+      html: icon(b.icon),
+      onclick: () => onPick?.(b, i, btn),
+    });
+    row.appendChild(btn);
+  });
+  return row;
+}
+
+/** Color line: swatch + native picker + hex + percentage. */
+export function colorLine(value, onChange, { showPct = true } = {}) {
   const parsed = rgbToHex(value);
   const hex = parsed.hex;
-  // If the element started fully transparent, a freshly-picked color should be
-  // opaque — otherwise the user's edit would be invisible.
   let alpha = parsed.alpha === 0 ? 1 : parsed.alpha;
   const picker = h('input', { type: 'color', value: hex });
   const swatch = h('div', { class: 'swatch' }, [picker]);
   swatch.style.background = value && value !== 'rgba(0, 0, 0, 0)' ? value : 'transparent';
-  const hexInput = h('input', { class: 'hex', value: hex });
+  const hexInput = h('input', { class: 'hex', value: hex.replace('#', '') });
+  const pct = showPct ? h('span', { class: 'pct', text: Math.round(alpha * 100) + '%' }) : null;
 
-  const push = (hx) => {
-    const out = hexToRgba(hx, alpha);
-    swatch.style.background = out;
-    onChange(out);
-  };
-  picker.addEventListener('input', () => { hexInput.value = picker.value; push(picker.value); });
+  const push = (hx) => { const out = hexToRgba(hx, alpha); swatch.style.background = out; onChange(out); };
+  picker.addEventListener('input', () => { hexInput.value = picker.value.replace('#', ''); push(picker.value); });
   hexInput.addEventListener('change', () => {
-    let v = hexInput.value.trim();
-    if (/^[0-9a-f]{3,6}$/i.test(v)) v = '#' + v;
-    if (/^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) { picker.value = v; push(v); }
-    else onChange(v); // allow named colors / gradients typed directly
+    let v = hexInput.value.trim().replace(/^#/, '');
+    if (/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) { picker.value = '#' + v; push('#' + v); }
+    else onChange(hexInput.value.trim());
   });
-  return h('div', { class: 'color-row' }, [
-    swatch,
-    h('span', { class: 'k', text: label }),
-    hexInput,
-  ]);
+  return h('div', { class: 'colorline' }, [swatch, hexInput, pct]);
 }
 
 /** Collapsible section. */
-export function section(title, contentNodes, { open = true, right = null } = {}) {
-  const content = h('div', { class: 'section-content' }, contentNodes);
-  const chev = h('span', { class: 'chev', html: '&#9662;' });
-  const head = h('div', { class: 'section-title' }, [
-    h('span', {}, [title]),
-    right || chev,
+export function section(title, contentNodes, { open = true } = {}) {
+  const content = h('div', { class: 'sec-content' }, contentNodes);
+  const head = h('div', { class: 'sec-head' }, [
+    h('span', { text: title }),
+    h('span', { class: 'chev', html: icon('chevron-down') }),
   ]);
   const sec = h('div', { class: 'section' + (open ? '' : ' closed') }, [head, content]);
-  head.addEventListener('click', (e) => {
-    if (right && right.contains(e.target)) return;
-    sec.classList.toggle('closed');
-  });
+  head.addEventListener('click', () => sec.classList.toggle('closed'));
   return sec;
 }
 
-/** The margin/padding box editor. sides = {margin:{top..}, padding:{top..}} */
+/** Small labelled wrapper: label text above a control. */
+export function labeled(label, node) {
+  return h('div', { class: 'stack' }, [h('span', { class: 'label', text: label }), node]);
+}
+
+/** The margin/padding box editor with the nested "Margin / Padding / Size" rings. */
 export function spacingBox(sides, onChange) {
-  const mk = (kind, side, val) => {
-    const inp = h('input', { class: `${kind[0]}-${side}`, value: parseLength(val).value });
+  const mk = (kind, side, val, cls) => {
+    const inp = h('input', { class: 'edge ' + cls, value: parseLength(val).value });
     inp.addEventListener('change', () => {
       const raw = inp.value.trim();
-      const v = /^-?[\d.]+$/.test(raw) ? raw + 'px' : raw;
-      onChange(`${kind}-${side}`, v);
+      onChange(`${kind}-${side}`, /^-?[\d.]+$/.test(raw) ? raw + 'px' : raw);
     });
     return inp;
   };
-  return h('div', { class: 'spacing' }, [
-    h('span', { class: 'lab m', text: 'margin' }),
-    h('span', { class: 'lab p', text: 'padding' }),
-    mk('margin', 'top', sides.margin.top),
-    mk('margin', 'right', sides.margin.right),
-    mk('margin', 'bottom', sides.margin.bottom),
-    mk('margin', 'left', sides.margin.left),
-    h('div', { class: 'inner' }, [
-      mk('padding', 'top', sides.padding.top),
-      mk('padding', 'right', sides.padding.right),
-      mk('padding', 'bottom', sides.padding.bottom),
-      mk('padding', 'left', sides.padding.left),
-      h('div', { class: 'center', text: 'content' }),
-    ]),
+  const positions = {
+    top: 'top:2px;left:50%;transform:translateX(-50%)',
+    bottom: 'bottom:2px;left:50%;transform:translateX(-50%)',
+    left: 'left:2px;top:50%;transform:translateY(-50%)',
+    right: 'right:2px;top:50%;transform:translateY(-50%)',
+  };
+  const place = (el, pos) => { el.setAttribute('style', positions[pos]); return el; };
+
+  const marginEdges = ['top', 'bottom', 'left', 'right'].map((s) =>
+    place(mk('margin', s, sides.margin[s], 'm-' + s), s));
+  const padPos = {
+    top: 'top:2px;left:50%;transform:translateX(-50%)',
+    bottom: 'bottom:2px;left:50%;transform:translateX(-50%)',
+    left: 'left:2px;top:50%;transform:translateY(-50%)',
+    right: 'right:2px;top:50%;transform:translateY(-50%)',
+  };
+  const padEdges = ['top', 'bottom', 'left', 'right'].map((s) => {
+    const el = mk('padding', s, sides.padding[s], 'p-' + s);
+    el.setAttribute('style', padPos[s]);
+    return el;
+  });
+
+  const sizeBox = h('div', { class: 'center-size' }, [
+    h('span', { class: 'tag', text: 'Size', style: 'position:static' }),
+  ]);
+  const padRing = h('div', { class: 'ring pad' }, [
+    h('span', { class: 'tag', text: 'Padding' }),
+    ...padEdges, sizeBox,
+  ]);
+  return h('div', { class: 'boxeditor' }, [
+    h('span', { class: 'tag', text: 'Margin' }),
+    ...marginEdges,
+    padRing,
   ]);
 }

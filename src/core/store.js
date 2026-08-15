@@ -5,7 +5,7 @@ const state = {
   hoverEl: null,          // element under cursor while picking
   selectedEl: null,       // currently selected element
   pseudo: 'none',         // none | hover | focus | active
-  tab: 'design',          // design | code | html
+  view: 'design',         // design | code | html (driven by the dock)
   // Map<inspectId, { selector, pseudo, props: Map<prop,value> }>
   edits: new Map(),
   panelPos: { x: null, y: 16 }, // panel screen position (null x = right-docked)
