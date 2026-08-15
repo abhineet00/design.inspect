@@ -5,6 +5,7 @@ import { store } from '../core/store.js';
 import { h, round, elementLabel } from '../core/util.js';
 import { readModel, composeTransform } from '../core/styleModel.js';
 import { setProp, generateCss, clearAll } from '../core/liveStyles.js';
+import { collectAll } from '../core/assets.js';
 import { icon } from '../icons/index.js';
 import {
   field, selectField, iconButtons, colorLine, section, labeled, spacingBox,
@@ -26,7 +27,8 @@ export class Panel {
     this.el.innerHTML = '';
     this.el.append(this._head());
     const body = h('div', { class: 'panel-body' });
-    if (!this.selected) {
+    if (st.view === 'assets') this._assets(body);
+    else if (!this.selected) {
       body.append(h('div', { class: 'empty', text: 'Pick an element on the page to inspect and edit its styles.' }));
     } else if (st.view === 'code') this._code(body);
     else if (st.view === 'html') this._html(body);
@@ -36,6 +38,19 @@ export class Panel {
 
   // ---------------- Header ----------------
   _head() {
+    const st = store.get();
+    if (st.view === 'assets') {
+      return h('div', { class: 'head' }, [
+        h('div', { class: 'head-top' }, [
+          h('div', { class: 'head-title', text: 'Assets' }),
+          h('div', { class: 'head-actions' }, [
+            hbtn('minimize-screen', 'Collapse panel', () => store.set({ collapsed: true })),
+            hbtn('x', 'Close', () => window.InspectCSS?.destroy()),
+          ]),
+        ]),
+        h('div', { class: 'crumb', style: { color: 'var(--muted)' }, text: 'Everything this page uses' }),
+      ]);
+    }
     const el = this.selected;
     const m = el ? readModel(el) : null;
     const crumb = el ? classChain(el) : [];
@@ -202,6 +217,64 @@ export class Panel {
     setTimeout(() => t.remove(), 1400);
   }
 
+  // ---------------- Assets view ----------------
+  _assets(body) {
+    const a = this._assetCache || (this._assetCache = collectAll());
+    const copy = (text, label) => { navigator.clipboard?.writeText(text); this._toast((label || 'Copied')); };
+
+    // Colors
+    const colorGrid = h('div', { class: 'asset-colors' }, a.colors.map((c) => {
+      const sw = h('button', {
+        class: 'asset-swatch', title: `${c.hex} · used ${c.count}×`,
+        style: { background: c.css }, onclick: () => copy(c.hex, c.hex + ' copied'),
+      });
+      return sw;
+    }));
+
+    // Typography
+    const typeList = h('div', { class: 'asset-type-list' }, a.typography.map((t) => {
+      const row = h('button', {
+        class: 'asset-type', title: 'Copy CSS',
+        onclick: () => copy(`font-family: ${t.family};\nfont-size: ${t.size};\nfont-weight: ${t.weight};`, 'Type style copied'),
+      }, [
+        h('div', { class: 'asset-type-preview', style: { fontFamily: t.family, fontSize: 'min(' + t.size + ', 28px)', fontWeight: t.weight }, text: 'Ag' }),
+        h('div', { class: 'asset-type-meta' }, [
+          h('div', { class: 'asset-type-name', text: t.family }),
+          h('div', { class: 'asset-type-sub', text: `${parseInt(t.size)}px · ${t.weight}` }),
+        ]),
+      ]);
+      return row;
+    }));
+
+    // SVGs
+    const svgGrid = h('div', { class: 'asset-grid' }, a.svgs.map((s) => {
+      const thumb = h('div', { class: 'asset-thumb asset-svg', title: 'Copy SVG' });
+      if (s.type === 'inline') thumb.innerHTML = s.markup;
+      else thumb.appendChild(h('img', { src: s.src, alt: '' }));
+      thumb.addEventListener('click', () => copy(s.markup || s.src, 'SVG copied'));
+      return thumb;
+    }));
+
+    // Images
+    const imgGrid = h('div', { class: 'asset-grid' }, a.images.map((im) => {
+      const thumb = h('div', { class: 'asset-thumb', title: 'Copy image URL' }, [
+        h('img', { src: im.src, alt: '', loading: 'lazy' }),
+      ]);
+      thumb.addEventListener('click', () => copy(im.src, 'Image URL copied'));
+      return thumb;
+    }));
+
+    body.append(
+      h('div', { class: 'view-actions' }, [
+        h('button', { class: 'btn primary', text: 'Rescan page', onclick: () => { this._assetCache = null; this.render(); } }),
+      ]),
+      assetSection('Colors', a.colors.length, colorGrid),
+      assetSection('Typography', a.typography.length, typeList),
+      assetSection('SVGs', a.svgs.length, svgGrid),
+      assetSection('Images', a.images.length, imgGrid),
+    );
+  }
+
   _drag() {
     let sx, sy, ox, oy, dragging = false;
     this.el.addEventListener('mousedown', (e) => {
@@ -233,6 +306,15 @@ function addRow(label, onAdd) {
     h('span', { class: 'k', text: label }),
     h('button', { class: 'addbtn', title: 'Add ' + label, html: icon('plus'), onclick: onAdd }),
   ]);
+}
+function assetSection(title, count, content) {
+  const head = h('div', { class: 'sec-head' }, [
+    h('span', {}, [title, h('span', { class: 'asset-count', text: String(count) })]),
+    h('span', { class: 'chev', html: icon('chevron-down') }),
+  ]);
+  const sec = h('div', { class: 'section' }, [head, h('div', { class: 'sec-content' }, [content])]);
+  head.addEventListener('click', () => sec.classList.toggle('closed'));
+  return sec;
 }
 function classChain(el) {
   const out = [];

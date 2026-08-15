@@ -8,7 +8,7 @@ import { Inspector } from './core/inspector.js';
 import { Panel } from './ui/panel.js';
 import { Toolbar } from './ui/toolbar.js';
 import { css } from './ui/theme.js';
-import { undo, redo, setProp } from './core/liveStyles.js';
+import { undo, redo } from './core/liveStyles.js';
 
 class App {
   constructor() {
@@ -28,7 +28,8 @@ class App {
     this.toolbar = new Toolbar(wrap, {
       undo: () => { undo(); this.panel.render(); },
       redo: () => { redo(); this.panel.render(); },
-      bump: (dir) => this.bumpZ(dir),
+      selectParent: () => this.selectRelative('parent'),
+      selectChild: () => this.selectRelative('child'),
       toggleResponsive: () => this.toggleResponsive(),
     });
     this.inspector = new Inspector(this.overlay, (el) => this.select(el));
@@ -61,13 +62,20 @@ class App {
     this.panel.set(el);
   }
 
-  bumpZ(dir) {
+  // Navigate the DOM: select the parent, or the first element child.
+  selectRelative(dir) {
     const el = store.get().selectedEl;
     if (!el) return;
-    const z = parseInt(getComputedStyle(el).zIndex) || 0;
-    setProp(el, 'position', getComputedStyle(el).position === 'static' ? 'relative' : getComputedStyle(el).position);
-    setProp(el, 'z-index', String(z + dir));
-    this.panel.render();
+    let next = null;
+    if (dir === 'parent') {
+      next = el.parentElement;
+      if (!next || next === document.documentElement || next === document.body) return;
+    } else {
+      next = [...el.children].find((c) => !c.closest('[data-inspect-ui]'));
+      if (!next) return;
+    }
+    store.set({ view: 'design', collapsed: false });
+    this.select(next);
   }
 
   toggleResponsive() {
@@ -85,6 +93,8 @@ class App {
     if (s.selectedEl) this.overlay.select(s.selectedEl);
     // re-render the panel when the view or visibility changes
     if (s.view !== this._prevView || s.collapsed !== this._prevCollapsed) {
+      // fresh scan each time the Assets view opens
+      if (s.view === 'assets' && this._prevView !== 'assets') this.panel._assetCache = null;
       this._prevView = s.view;
       this._prevCollapsed = s.collapsed;
       this.panel.render();
@@ -112,7 +122,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.3.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.4.0' };
 }
 
 boot();

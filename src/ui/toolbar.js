@@ -28,10 +28,13 @@ export class Toolbar {
       dockBtn('undo-03', 'Undo', () => this.api.undo?.()),
       dockBtn('redo-01', 'Redo', () => this.api.redo?.()),
       sep(),
-      dockBtn('layer-bring-forward', 'Bring forward', () => this.api.bump?.(1)),
-      dockBtn('layer-send-backward', 'Send backward', () => this.api.bump?.(-1)),
+      dockBtn('layer-send-backward', 'Select parent element', () => this.api.selectParent?.()),
+      dockBtn('layer-bring-forward', 'Select child element', () => this.api.selectChild?.()),
       sep(),
-      this.designBtn = dockBtn('component', 'Design', () => store.set({ view: 'design', collapsed: false })),
+      this.assetsBtn = dockBtn('component', 'Assets (page colors, type, SVGs, images)', () => {
+        const v = store.get().view;
+        store.set({ view: v === 'assets' ? 'design' : 'assets', collapsed: false });
+      }),
       this.codeBtn = dockBtn('file-diff', 'Generated CSS', () => store.set({ view: 'code', collapsed: false })),
       this.htmlBtn = dockBtn('html-file-01', 'HTML', () => store.set({ view: 'html', collapsed: false })),
       sep(),
@@ -48,7 +51,7 @@ export class Toolbar {
   sync() {
     const s = store.get();
     this.pauseBtn?.classList.toggle('active', s.active);
-    this.designBtn?.classList.toggle('active', s.view === 'design');
+    this.assetsBtn?.classList.toggle('active', s.view === 'assets');
     this.codeBtn?.classList.toggle('active', s.view === 'code');
     this.htmlBtn?.classList.toggle('active', s.view === 'html');
   }

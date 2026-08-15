@@ -193,6 +193,41 @@ ${fontFace}
 .btn.primary { background: var(--blue); color: #001427; }
 .empty { color: var(--muted); text-align: center; padding: 32px 16px; font-size: 15px; }
 
+/* ---------- Assets view ---------- */
+.asset-count {
+  margin-left: 8px; font-size: 13px; font-weight: 500; color: var(--muted);
+  background: var(--field); border-radius: 20px; padding: 1px 8px;
+}
+.asset-colors { display: grid; grid-template-columns: repeat(8, 1fr); gap: 8px; }
+.asset-swatch {
+  aspect-ratio: 1; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer; padding: 0; transition: transform .1s;
+  background-clip: padding-box;
+}
+.asset-swatch:hover { transform: scale(1.08); border-color: var(--blue); }
+
+.asset-type-list { display: flex; flex-direction: column; gap: 8px; }
+.asset-type {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: var(--field); border: 1px solid transparent; border-radius: var(--r-field);
+  padding: 8px 12px; cursor: pointer; color: var(--text); font-family: var(--font);
+}
+.asset-type:hover { border-color: var(--blue); }
+.asset-type-preview { width: 40px; flex: none; text-align: center; color: var(--text); overflow: hidden; line-height: 1; }
+.asset-type-meta { min-width: 0; }
+.asset-type-name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.asset-type-sub { font-size: 13px; color: var(--muted); }
+
+.asset-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.asset-thumb {
+  aspect-ratio: 1; border-radius: 10px; background: var(--field);
+  border: 1px solid rgba(255,255,255,0.08); display: grid; place-items: center;
+  cursor: pointer; overflow: hidden; padding: 8px;
+}
+.asset-thumb:hover { border-color: var(--blue); }
+.asset-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.asset-svg svg { width: 100%; height: 100%; max-width: 40px; max-height: 40px; color: var(--text); }
+
 /* ---------- Vertical toolbar dock ---------- */
 .dock { position: fixed; top: 50%; left: 16px; transform: translateY(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 10px; z-index: 2147483646;
