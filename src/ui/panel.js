@@ -43,7 +43,7 @@ export class Panel {
       h('div', { class: 'head-top' }, [
         h('div', { class: 'head-title', text: el ? elementLabel(el) || m.tag : 'InspectCSS' }),
         h('div', { class: 'head-actions' }, [
-          hbtn('delete02', 'Reset all edits', () => { clearAll(); this.render(); }),
+          hbtn('delete02', 'Reset all edits', () => { clearAll(); this.render(); }, 'danger'),
           hbtn('minimize-screen', 'Collapse panel', () => store.set({ collapsed: true })),
           hbtn('x', 'Close', () => window.InspectCSS?.destroy()),
         ]),
@@ -227,8 +227,8 @@ export class Panel {
 }
 
 // ---- helpers ----
-function hbtn(name, title, onClick) {
-  return h('button', { class: 'hbtn', title, onclick: onClick, html: icon(name) });
+function hbtn(name, title, onClick, extra = '') {
+  return h('button', { class: 'hbtn' + (extra ? ' ' + extra : ''), title, onclick: onClick, html: icon(name) });
 }
 function addRow(label, onAdd) {
   return h('div', { class: 'addrow' }, [

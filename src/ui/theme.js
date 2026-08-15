@@ -2,8 +2,10 @@
 // Colors, radii, spacing and typography are taken 1:1 from the Figma design
 // ("full - final (@20px base size)").
 
+import { fontFace } from './font.js';
+
 export const css = /* css */ `
-@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
+${fontFace}
 
 :host { all: initial; }
 *, *::before, *::after { box-sizing: border-box; }
@@ -72,6 +74,7 @@ export const css = /* css */ `
   color: var(--text); cursor: pointer; opacity: .85; padding: 0;
 }
 .hbtn:hover { opacity: 1; }
+.hbtn.danger { color: #e05151; opacity: 1; }
 .hbtn svg { width: 20px; height: 20px; }
 .crumb { color: var(--orange); font-size: 18px; font-weight: 500; margin-top: 7px; display: flex; gap: 8px; flex-wrap: wrap; }
 .dims { color: var(--muted); font-size: 20px; margin-top: 10px; display: flex; gap: 12px; align-items: baseline; }
