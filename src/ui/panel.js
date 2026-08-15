@@ -99,8 +99,8 @@ export class Panel {
         onChange: on('display'),
       })),
       h('div', { class: 'row' }, [
-        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, onChange: on('row-gap') })),
-        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, onChange: on('column-gap') })),
+        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, sm: true, onChange: on('row-gap') })),
+        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, sm: true, onChange: on('column-gap') })),
       ]),
       h('div', { class: 'row' }, [
         labeled('Horizontal Align', selectField({ value: m.layout.justify, options: [['flex-start', 'Start'], ['center', 'Center'], ['flex-end', 'End'], ['space-between', 'Between']], onChange: on('justify-content') })),
@@ -157,11 +157,11 @@ export class Panel {
         selectField({ value: parseInt(m.typography.fontSize) + '', options: ['10', '12', '13', '14', '16', '18', '20', '24', '32', '48'].map((x) => [x, x]), onChange: (v) => on('font-size')(v + 'px') }),
       ]),
       h('div', { class: 'row' }, [
-        labeled('Line Height', field({ iconName: 'paragraph-spacing', value: normalizeLine(m.typography.lineHeight), showUnit: false, onChange: on('line-height') })),
-        labeled('Letter Spacing', field({ iconName: 'letter-spacing', value: m.typography.letterSpacing, showUnit: false, onChange: on('letter-spacing') })),
+        labeled('Line Height', field({ iconName: 'paragraph-spacing', value: normalizeLine(m.typography.lineHeight), showUnit: false, sm: true, onChange: on('line-height') })),
+        labeled('Letter Spacing', field({ iconName: 'letter-spacing', value: m.typography.letterSpacing, showUnit: false, sm: true, onChange: on('letter-spacing') })),
       ]),
       h('div', { class: 'row' }, [
-        labeled('Paragraph Spacing', field({ iconName: 'expand-paragraph', value: parseLenSafe(m.typography.marginBottom), onChange: on('margin-bottom') })),
+        labeled('Paragraph Spacing', field({ iconName: 'expand-paragraph', value: parseLenSafe(m.typography.marginBottom), sm: true, onChange: on('margin-bottom') })),
         labeled('Alignment', iconButtons([
           { icon: 'text-align-right', title: 'Right', css: 'right' },
           { icon: 'text-align-center', title: 'Center', css: 'center' },

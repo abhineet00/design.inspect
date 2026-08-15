@@ -12,7 +12,7 @@ function chevMini() {
 }
 
 /** Field with a leading key (letter or icon) and an optional unit. */
-export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true }) {
+export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true, sm = false }) {
   const parsed = parseLength(value);
   const input = h('input', { value: parsed.value, type: 'text', inputmode: 'decimal' });
   const unitEl = showUnit ? h('span', { class: 'unit', text: parsed.unit || unit }) : null;
@@ -40,7 +40,7 @@ export function field({ key, iconName, value, unit = 'px', onChange, showUnit = 
       commit();
     });
   }
-  return h('div', { class: 'field' }, [
+  return h('div', { class: 'field' + (sm ? ' sm' : '') }, [
     iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null),
     input,
     unitEl,
@@ -48,7 +48,7 @@ export function field({ key, iconName, value, unit = 'px', onChange, showUnit = 
 }
 
 /** A <select> styled as a field, with the design's chevron. */
-export function selectField({ value, options, onChange, iconName, key }) {
+export function selectField({ value, options, onChange, iconName, key, sm = true }) {
   const sel = h('select', {});
   for (const opt of options) {
     const [v, l] = Array.isArray(opt) ? opt : [opt, opt];
@@ -57,7 +57,7 @@ export function selectField({ value, options, onChange, iconName, key }) {
     sel.appendChild(o);
   }
   sel.addEventListener('change', () => onChange(sel.value));
-  return h('div', { class: 'field select-like' }, [
+  return h('div', { class: 'field select-like' + (sm ? ' sm' : '') }, [
     iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null),
     sel,
     chevMini(),
