@@ -65,13 +65,14 @@ export class Panel {
     // ----- Position -----
     const t = m.transform;
     const setT = (patch) => { Object.assign(t, patch); setProp(el, 'transform', composeTransform(t)); };
+    // Alignment icon order matches the design exactly.
     const alignIcons = [
-      { icon: 'align-left', title: 'Align left', css: ['text-align', 'left'] },
-      { icon: 'align-horizontal-center', title: 'Center horizontally', css: ['text-align', 'center'] },
-      { icon: 'align-right', title: 'Align right', css: ['text-align', 'right'] },
-      { icon: 'align-top', title: 'Align top', css: ['align-items', 'flex-start'] },
-      { icon: 'align-vertical-center', title: 'Center vertically', css: ['align-items', 'center'] },
+      { icon: 'align-left', title: 'Align left', css: ['justify-content', 'flex-start'] },
       { icon: 'align-bottom', title: 'Align bottom', css: ['align-items', 'flex-end'] },
+      { icon: 'align-right', title: 'Align right', css: ['justify-content', 'flex-end'] },
+      { icon: 'align-top', title: 'Align top', css: ['align-items', 'flex-start'] },
+      { icon: 'align-horizontal-center', title: 'Center horizontally', css: ['justify-content', 'center'] },
+      { icon: 'align-vertical-center', title: 'Center vertically', css: ['align-items', 'center'] },
     ];
     body.append(section('Position', [
       labeled('Alignment', iconButtons(alignIcons, { grow: true, onPick: (b) => setProp(el, b.css[0], b.css[1]) })),
@@ -79,10 +80,10 @@ export class Panel {
         field({ key: 'X', value: t.tx + 'px', onChange: (v) => setT({ tx: parseFloat(v) || 0 }) }),
         field({ key: 'Y', value: t.ty + 'px', onChange: (v) => setT({ ty: parseFloat(v) || 0 }) }),
       ])),
-      labeled('Rotation', h('div', { class: 'row-3' }, [
+      labeled('Rotation', h('div', { class: 'rot-row' }, [
         field({ iconName: 'rotate01', value: t.rotate + '', showUnit: false, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
-        iconButtons([{ icon: 'image-flip-horizontal', title: 'Flip horizontal' }], { onPick: () => flip(el, 'x') }),
-        iconButtons([{ icon: 'image-flip-vertical', title: 'Flip vertical' }], { onPick: () => flip(el, 'y') }),
+        iconButtons([{ icon: 'image-flip-horizontal', title: 'Flip horizontal' }], { grow: true, onPick: () => flip(el, 'x') }),
+        iconButtons([{ icon: 'image-flip-vertical', title: 'Flip vertical' }], { grow: true, onPick: () => flip(el, 'y') }),
       ])),
     ]));
 
@@ -98,7 +99,7 @@ export class Panel {
         onChange: on('display'),
       })),
       h('div', { class: 'row' }, [
-        labeled('Row Gap', field({ iconName: 'vertical-resize', value: m.layout.rowGap, showUnit: false, onChange: on('row-gap') })),
+        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, onChange: on('row-gap') })),
         labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, onChange: on('column-gap') })),
       ]),
       h('div', { class: 'row' }, [
@@ -117,7 +118,7 @@ export class Panel {
         field({ iconName: 'horizontal-resize', value: m.spacing.margin.left, onChange: (v) => { on('margin-left')(v); on('margin-right')(v); } }),
         field({ iconName: 'vertical-resize', value: m.spacing.margin.top, onChange: (v) => { on('margin-top')(v); on('margin-bottom')(v); } }),
       ])),
-      spacingBox(m.spacing, (prop, v) => setProp(el, prop, v)),
+      spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v)),
     ]));
 
     // ----- Appearance -----
@@ -127,13 +128,17 @@ export class Panel {
       { key: 'bl', prop: 'border-bottom-left-radius', v: m.radius.bl },
       { key: 'br', prop: 'border-bottom-right-radius', v: m.radius.br },
     ];
+    const mixed = new Set([m.radius.tl, m.radius.tr, m.radius.bl, m.radius.br]).size > 1;
     body.append(section('Appearance', [
       h('div', { class: 'row' }, [
         labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
-        labeled('Corner', field({ iconName: 'vector', value: m.radius.all, onChange: on('border-radius') })),
+        labeled('Corner', h('div', { class: 'corner-mix' }, [
+          field({ iconName: 'full-screen', value: mixed ? 'mix' : m.radius.all, showUnit: false, onChange: on('border-radius') }),
+          iconButtons([{ icon: 'full-screen', title: 'Link corners' }], { onPick: () => on('border-radius')(m.radius.tl) }),
+        ])),
       ]),
       h('div', { class: 'corner-grid' }, corners.map((c) =>
-        field({ iconName: 'vector', value: c.v, onChange: on(c.prop) }))),
+        field({ iconName: 'full-screen', value: c.v, showUnit: false, onChange: on(c.prop) }))),
       labeled('', addRow('Fill', () => on('background-color')('#ffffff'))),
       m.background.color && m.background.color !== 'rgba(0, 0, 0, 0)'
         ? colorLine(m.background.color, on('background-color')) : null,
@@ -152,17 +157,17 @@ export class Panel {
         selectField({ value: parseInt(m.typography.fontSize) + '', options: ['10', '12', '13', '14', '16', '18', '20', '24', '32', '48'].map((x) => [x, x]), onChange: (v) => on('font-size')(v + 'px') }),
       ]),
       h('div', { class: 'row' }, [
-        labeled('Line Height', field({ iconName: 'expand-paragraph', value: normalizeLine(m.typography.lineHeight), showUnit: false, onChange: on('line-height') })),
+        labeled('Line Height', field({ iconName: 'paragraph-spacing', value: normalizeLine(m.typography.lineHeight), showUnit: false, onChange: on('line-height') })),
         labeled('Letter Spacing', field({ iconName: 'letter-spacing', value: m.typography.letterSpacing, showUnit: false, onChange: on('letter-spacing') })),
       ]),
       h('div', { class: 'row' }, [
-        labeled('Paragraph Spacing', field({ iconName: 'paragraph-spacing', value: parseLenSafe(m.typography.marginBottom), onChange: on('margin-bottom') })),
+        labeled('Paragraph Spacing', field({ iconName: 'expand-paragraph', value: parseLenSafe(m.typography.marginBottom), onChange: on('margin-bottom') })),
         labeled('Alignment', iconButtons([
-          { icon: 'text-align-start', title: 'Left', css: 'left' },
-          { icon: 'text-align-center', title: 'Center', css: 'center' },
           { icon: 'text-align-right', title: 'Right', css: 'right' },
+          { icon: 'text-align-center', title: 'Center', css: 'center' },
+          { icon: 'text-align-start', title: 'Left', css: 'left' },
           { icon: 'text-align-justify', title: 'Justify', css: 'justify' },
-        ], { grow: true, active: ['left', 'center', 'right', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
+        ], { grow: true, active: ['right', 'center', 'left', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
       ]),
     ]));
   }

@@ -92,6 +92,8 @@ export const css = /* css */ `
 .label { color: var(--muted); font-size: 12px; font-weight: 400; margin-bottom: 6px; display: block; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.rot-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+.rot-row .iconrow { height: 100%; }
 .stack { display: flex; flex-direction: column; }
 
 /* ---------- Field ---------- */
@@ -132,18 +134,19 @@ export const css = /* css */ `
 
 /* ---------- Spacing box ---------- */
 .spacing-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 8px; position: relative; }
-.boxeditor .ring { border-radius: 12px; padding: 8px; position: relative; }
-.boxeditor .ring.pad { background: var(--box-content); }
-.boxeditor .tag { position: absolute; top: 6px; left: 10px; font-size: 10px; color: var(--muted); font-weight: 400; }
+.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 30px 40px; position: relative; margin-top: 2px; }
+.boxeditor .ring { border-radius: 12px; padding: 28px 40px; position: relative; }
+.boxeditor .ring.pad { background: var(--box-content); border: 1px dashed var(--line); }
+.boxeditor .tag { position: absolute; top: 7px; left: 12px; font-size: 10px; color: var(--muted); font-weight: 400; z-index: 1; }
 .boxeditor .center-size {
   background: #000; border: 1px dashed var(--line); border-radius: 10px;
-  padding: 22px 8px; text-align: center; color: var(--text); font-size: 13px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 26px 8px; text-align: center; color: var(--text); font-size: 13px;
+  display: flex; align-items: center; justify-content: center; gap: 6px; position: relative;
 }
+.boxeditor .center-size .tag { position: absolute; top: 6px; left: 10px; }
 .boxeditor .edge {
-  position: absolute; width: 34px; text-align: center; background: transparent;
-  border: none; color: var(--text); font-size: 11px; font-family: var(--font); outline: none;
+  position: absolute; width: 40px; text-align: center; background: transparent;
+  border: none; color: var(--text); font-size: 11px; font-family: var(--font); outline: none; z-index: 2;
 }
 .boxeditor .edge:focus { color: var(--blue); }
 

@@ -150,7 +150,8 @@ export function spacingBox(sides, onChange) {
   });
 
   const sizeBox = h('div', { class: 'center-size' }, [
-    h('span', { class: 'tag', text: 'Size', style: 'position:static' }),
+    h('span', { class: 'tag', text: 'Size' }),
+    h('span', { text: parseLength(sides.width || '0').value + ' × ' + parseLength(sides.height || '0').value }),
   ]);
   const padRing = h('div', { class: 'ring pad' }, [
     h('span', { class: 'tag', text: 'Padding' }),

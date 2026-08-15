@@ -36,6 +36,21 @@ class App {
     this._prevView = store.get().view;
     this._prevCollapsed = store.get().collapsed;
     this.unsub = store.subscribe((s) => this.onState(s));
+
+    // Keep the hover/selection overlays glued to their elements while the page
+    // scrolls or resizes — always on, independent of picking mode.
+    this._track = () => {
+      if (this._raf) return;
+      this._raf = requestAnimationFrame(() => {
+        this._raf = 0;
+        const s = store.get();
+        if (s.hoverEl) this.overlay.highlight(s.hoverEl);
+        if (s.selectedEl) this.overlay.select(s.selectedEl);
+      });
+    };
+    window.addEventListener('scroll', this._track, true);
+    window.addEventListener('resize', this._track, true);
+
     store.set({ active: true });
     this.panel.render();
   }
@@ -78,6 +93,8 @@ class App {
 
   destroy() {
     this.unsub?.();
+    window.removeEventListener('scroll', this._track, true);
+    window.removeEventListener('resize', this._track, true);
     this.inspector.stop();
     this.overlay.destroy();
     this.host.remove();

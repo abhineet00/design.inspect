@@ -657,7 +657,8 @@ ${body}
       return el;
     });
     const sizeBox = h("div", { class: "center-size" }, [
-      h("span", { class: "tag", text: "Size", style: "position:static" })
+      h("span", { class: "tag", text: "Size" }),
+      h("span", { text: parseLength(sides2.width || "0").value + " \xD7 " + parseLength(sides2.height || "0").value })
     ]);
     const padRing = h("div", { class: "ring pad" }, [
       h("span", { class: "tag", text: "Padding" }),
@@ -734,12 +735,12 @@ ${body}
         setProp(el, "transform", composeTransform(t));
       };
       const alignIcons = [
-        { icon: "align-left", title: "Align left", css: ["text-align", "left"] },
-        { icon: "align-horizontal-center", title: "Center horizontally", css: ["text-align", "center"] },
-        { icon: "align-right", title: "Align right", css: ["text-align", "right"] },
+        { icon: "align-left", title: "Align left", css: ["justify-content", "flex-start"] },
+        { icon: "align-bottom", title: "Align bottom", css: ["align-items", "flex-end"] },
+        { icon: "align-right", title: "Align right", css: ["justify-content", "flex-end"] },
         { icon: "align-top", title: "Align top", css: ["align-items", "flex-start"] },
-        { icon: "align-vertical-center", title: "Center vertically", css: ["align-items", "center"] },
-        { icon: "align-bottom", title: "Align bottom", css: ["align-items", "flex-end"] }
+        { icon: "align-horizontal-center", title: "Center horizontally", css: ["justify-content", "center"] },
+        { icon: "align-vertical-center", title: "Center vertically", css: ["align-items", "center"] }
       ];
       body.append(section("Position", [
         labeled("Alignment", iconButtons(alignIcons, { grow: true, onPick: (b) => setProp(el, b.css[0], b.css[1]) })),
@@ -747,10 +748,10 @@ ${body}
           field({ key: "X", value: t.tx + "px", onChange: (v) => setT({ tx: parseFloat(v) || 0 }) }),
           field({ key: "Y", value: t.ty + "px", onChange: (v) => setT({ ty: parseFloat(v) || 0 }) })
         ])),
-        labeled("Rotation", h("div", { class: "row-3" }, [
+        labeled("Rotation", h("div", { class: "rot-row" }, [
           field({ iconName: "rotate01", value: t.rotate + "", showUnit: false, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
-          iconButtons([{ icon: "image-flip-horizontal", title: "Flip horizontal" }], { onPick: () => flip(el, "x") }),
-          iconButtons([{ icon: "image-flip-vertical", title: "Flip vertical" }], { onPick: () => flip(el, "y") })
+          iconButtons([{ icon: "image-flip-horizontal", title: "Flip horizontal" }], { grow: true, onPick: () => flip(el, "x") }),
+          iconButtons([{ icon: "image-flip-vertical", title: "Flip vertical" }], { grow: true, onPick: () => flip(el, "y") })
         ]))
       ]));
       body.append(section("Layout", [
@@ -764,7 +765,7 @@ ${body}
           onChange: on("display")
         })),
         h("div", { class: "row" }, [
-          labeled("Row Gap", field({ iconName: "vertical-resize", value: m.layout.rowGap, showUnit: false, onChange: on("row-gap") })),
+          labeled("Row Gap", field({ iconName: "paragraph-spacing", value: m.layout.rowGap, showUnit: false, onChange: on("row-gap") })),
           labeled("Column Gap", field({ iconName: "letter-spacing", value: m.layout.columnGap, showUnit: false, onChange: on("column-gap") }))
         ]),
         h("div", { class: "row" }, [
@@ -793,7 +794,7 @@ ${body}
             on("margin-bottom")(v);
           } })
         ])),
-        spacingBox(m.spacing, (prop, v) => setProp(el, prop, v))
+        spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v))
       ]));
       const corners = [
         { key: "tl", prop: "border-top-left-radius", v: m.radius.tl },
@@ -801,12 +802,16 @@ ${body}
         { key: "bl", prop: "border-bottom-left-radius", v: m.radius.bl },
         { key: "br", prop: "border-bottom-right-radius", v: m.radius.br }
       ];
+      const mixed = (/* @__PURE__ */ new Set([m.radius.tl, m.radius.tr, m.radius.bl, m.radius.br])).size > 1;
       body.append(section("Appearance", [
         h("div", { class: "row" }, [
           labeled("Opacity", field({ iconName: "transparency", value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: "%", onChange: (v) => on("opacity")((parseFloat(v) || 100) / 100) })),
-          labeled("Corner", field({ iconName: "vector", value: m.radius.all, onChange: on("border-radius") }))
+          labeled("Corner", h("div", { class: "corner-mix" }, [
+            field({ iconName: "full-screen", value: mixed ? "mix" : m.radius.all, showUnit: false, onChange: on("border-radius") }),
+            iconButtons([{ icon: "full-screen", title: "Link corners" }], { onPick: () => on("border-radius")(m.radius.tl) })
+          ]))
         ]),
-        h("div", { class: "corner-grid" }, corners.map((c) => field({ iconName: "vector", value: c.v, onChange: on(c.prop) }))),
+        h("div", { class: "corner-grid" }, corners.map((c) => field({ iconName: "full-screen", value: c.v, showUnit: false, onChange: on(c.prop) }))),
         labeled("", addRow("Fill", () => on("background-color")("#ffffff"))),
         m.background.color && m.background.color !== "rgba(0, 0, 0, 0)" ? colorLine(m.background.color, on("background-color")) : null,
         labeled("", addRow("Stroke", () => {
@@ -827,17 +832,17 @@ ${body}
           selectField({ value: parseInt(m.typography.fontSize) + "", options: ["10", "12", "13", "14", "16", "18", "20", "24", "32", "48"].map((x) => [x, x]), onChange: (v) => on("font-size")(v + "px") })
         ]),
         h("div", { class: "row" }, [
-          labeled("Line Height", field({ iconName: "expand-paragraph", value: normalizeLine(m.typography.lineHeight), showUnit: false, onChange: on("line-height") })),
+          labeled("Line Height", field({ iconName: "paragraph-spacing", value: normalizeLine(m.typography.lineHeight), showUnit: false, onChange: on("line-height") })),
           labeled("Letter Spacing", field({ iconName: "letter-spacing", value: m.typography.letterSpacing, showUnit: false, onChange: on("letter-spacing") }))
         ]),
         h("div", { class: "row" }, [
-          labeled("Paragraph Spacing", field({ iconName: "paragraph-spacing", value: parseLenSafe(m.typography.marginBottom), onChange: on("margin-bottom") })),
+          labeled("Paragraph Spacing", field({ iconName: "expand-paragraph", value: parseLenSafe(m.typography.marginBottom), onChange: on("margin-bottom") })),
           labeled("Alignment", iconButtons([
-            { icon: "text-align-start", title: "Left", css: "left" },
-            { icon: "text-align-center", title: "Center", css: "center" },
             { icon: "text-align-right", title: "Right", css: "right" },
+            { icon: "text-align-center", title: "Center", css: "center" },
+            { icon: "text-align-start", title: "Left", css: "left" },
             { icon: "text-align-justify", title: "Justify", css: "justify" }
-          ], { grow: true, active: ["left", "center", "right", "justify"].indexOf(m.typography.textAlign), onPick: (b) => on("text-align")(b.css) }))
+          ], { grow: true, active: ["right", "center", "left", "justify"].indexOf(m.typography.textAlign), onPick: (b) => on("text-align")(b.css) }))
         ])
       ]));
     }
@@ -1105,6 +1110,8 @@ ${body}
 .label { color: var(--muted); font-size: 12px; font-weight: 400; margin-bottom: 6px; display: block; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.rot-row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+.rot-row .iconrow { height: 100%; }
 .stack { display: flex; flex-direction: column; }
 
 /* ---------- Field ---------- */
@@ -1145,18 +1152,19 @@ ${body}
 
 /* ---------- Spacing box ---------- */
 .spacing-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 8px; position: relative; }
-.boxeditor .ring { border-radius: 12px; padding: 8px; position: relative; }
-.boxeditor .ring.pad { background: var(--box-content); }
-.boxeditor .tag { position: absolute; top: 6px; left: 10px; font-size: 10px; color: var(--muted); font-weight: 400; }
+.boxeditor { background: var(--box-margin); border-radius: 16px; padding: 30px 40px; position: relative; margin-top: 2px; }
+.boxeditor .ring { border-radius: 12px; padding: 28px 40px; position: relative; }
+.boxeditor .ring.pad { background: var(--box-content); border: 1px dashed var(--line); }
+.boxeditor .tag { position: absolute; top: 7px; left: 12px; font-size: 10px; color: var(--muted); font-weight: 400; z-index: 1; }
 .boxeditor .center-size {
   background: #000; border: 1px dashed var(--line); border-radius: 10px;
-  padding: 22px 8px; text-align: center; color: var(--text); font-size: 13px;
-  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 26px 8px; text-align: center; color: var(--text); font-size: 13px;
+  display: flex; align-items: center; justify-content: center; gap: 6px; position: relative;
 }
+.boxeditor .center-size .tag { position: absolute; top: 6px; left: 10px; }
 .boxeditor .edge {
-  position: absolute; width: 34px; text-align: center; background: transparent;
-  border: none; color: var(--text); font-size: 11px; font-family: var(--font); outline: none;
+  position: absolute; width: 40px; text-align: center; background: transparent;
+  border: none; color: var(--text); font-size: 11px; font-family: var(--font); outline: none; z-index: 2;
 }
 .boxeditor .edge:focus { color: var(--blue); }
 
@@ -1249,6 +1257,17 @@ ${body}
       this._prevView = store.get().view;
       this._prevCollapsed = store.get().collapsed;
       this.unsub = store.subscribe((s) => this.onState(s));
+      this._track = () => {
+        if (this._raf) return;
+        this._raf = requestAnimationFrame(() => {
+          this._raf = 0;
+          const s = store.get();
+          if (s.hoverEl) this.overlay.highlight(s.hoverEl);
+          if (s.selectedEl) this.overlay.select(s.selectedEl);
+        });
+      };
+      window.addEventListener("scroll", this._track, true);
+      window.addEventListener("resize", this._track, true);
       store.set({ active: true });
       this.panel.render();
     }
@@ -1297,6 +1316,8 @@ ${body}
     destroy() {
       var _a;
       (_a = this.unsub) == null ? void 0 : _a.call(this);
+      window.removeEventListener("scroll", this._track, true);
+      window.removeEventListener("resize", this._track, true);
       this.inspector.stop();
       this.overlay.destroy();
       this.host.remove();
