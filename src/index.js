@@ -57,7 +57,9 @@ class App {
   }
 
   select(el) {
-    store.set({ selectedEl: el, active: false });
+    // Stay in picking mode after a selection: hovering keeps showing guides and
+    // you can click another element at any time. The pause button stops picking.
+    store.set({ selectedEl: el });
     this.overlay.select(el);
     this.panel.set(el);
   }

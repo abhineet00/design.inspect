@@ -11,7 +11,8 @@ export class Overlay {
         position: 'fixed',
         inset: '0',
         pointerEvents: 'none',
-        zIndex: '2147483646',
+        // Below the panel/dock (2147483646) so highlights never cover our UI.
+        zIndex: '2147483640',
       },
     });
     // Layers: margin, padding, content border, size badge, selected outline.

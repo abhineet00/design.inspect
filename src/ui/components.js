@@ -14,8 +14,11 @@ function chevMini() {
 /** Field with a leading key (letter or icon) and an optional unit. */
 export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true, sm = false }) {
   const parsed = parseLength(value);
+  // Only trust the parsed unit if the incoming value actually carried one;
+  // otherwise use the caller's unit (e.g. '%' for opacity), not the px default.
+  const hadUnit = /[a-z%]/i.test(String(value ?? ''));
   const input = h('input', { value: parsed.value, type: 'text', inputmode: 'decimal' });
-  const unitEl = showUnit ? h('span', { class: 'unit', text: parsed.unit || unit }) : null;
+  const unitEl = showUnit ? h('span', { class: 'unit', text: hadUnit ? parsed.unit : unit }) : null;
 
   const commit = () => {
     const raw = input.value.trim();

@@ -113,7 +113,8 @@
           position: "fixed",
           inset: "0",
           pointerEvents: "none",
-          zIndex: "2147483646"
+          // Below the panel/dock (2147483646) so highlights never cover our UI.
+          zIndex: "2147483640"
         }
       });
       this.margin = this._box("rgba(246, 178, 107, 0.28)");
@@ -637,8 +638,9 @@ ${body}
   }
   function field({ key, iconName, value, unit = "px", onChange, showUnit = true, sm = false }) {
     const parsed = parseLength(value);
+    const hadUnit = /[a-z%]/i.test(String(value != null ? value : ""));
     const input = h("input", { value: parsed.value, type: "text", inputmode: "decimal" });
-    const unitEl = showUnit ? h("span", { class: "unit", text: parsed.unit || unit }) : null;
+    const unitEl = showUnit ? h("span", { class: "unit", text: hadUnit ? parsed.unit : unit }) : null;
     const commit = () => {
       const raw = input.value.trim();
       if (raw === "") return onChange("");
@@ -1253,9 +1255,9 @@ ${fontFace}
   background: var(--panel-bg);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
-  border: 1px solid var(--border-soft);
+  border: none;
   border-radius: var(--r-panel);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   display: flex; flex-direction: column;
   overflow: hidden;
   z-index: 2147483646;
@@ -1303,7 +1305,10 @@ ${fontFace}
 .rot-row { display: grid; grid-template-columns: 1fr 67px 67px; gap: 8px; }
 .rot-row .iconrow { height: 100%; }
 .rot-row .ibtn { border-radius: 12px; width: 100%; }
-.stack { display: flex; flex-direction: column; }
+.stack { display: flex; flex-direction: column; min-width: 0; }
+/* Grid children default to min-width:auto and refuse to shrink; force them to
+   0 so two-column rows always split evenly instead of overflowing. */
+.row > *, .row-3 > *, .rot-row > *, .corner-grid > *, .corner-mix > * { min-width: 0; }
 
 /* ---------- Field ---------- */
 .field {
@@ -1510,7 +1515,7 @@ ${fontFace}
       this.panel.render();
     }
     select(el) {
-      store.set({ selectedEl: el, active: false });
+      store.set({ selectedEl: el });
       this.overlay.select(el);
       this.panel.set(el);
     }
