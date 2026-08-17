@@ -243,12 +243,64 @@ export class Panel {
     ));
   }
 
+  // ---------------- HTML view: interactive DOM tree ----------------
   _html(body) {
-    const el = this.selected;
-    if (!el) return body.append(h('div', { class: 'empty', text: 'No element selected.' }));
-    const clone = el.cloneNode(false);
-    clone.removeAttribute('data-inspect-id');
-    body.append(h('pre', { class: 'code', html: escapeHtml(clone.outerHTML.replace(/></, '>\n  …\n<')) }));
+    this._expanded = this._expanded || new Set();
+    // Always show the top-level structure; expand ancestors of the selection.
+    this._expanded.add(document.documentElement);
+    this._expanded.add(document.body);
+    if (this.selected) {
+      let n = this.selected.parentElement;
+      while (n) { this._expanded.add(n); n = n.parentElement; }
+    }
+
+    const tree = h('div', { class: 'domtree' });
+    this._renderNode(document.documentElement, tree, 0);
+
+    const footer = h('div', { class: 'tree-footer' }, [
+      h('button', { class: 'tree-btn', onclick: () => store.set({ view: 'design' }) },
+        [h('span', { html: TREE_ICONS.back }), 'Back']),
+      h('button', { class: 'tree-btn', onclick: () => store.set({ active: true }) },
+        [h('span', { html: TREE_ICONS.pick }), 'Pick an element']),
+    ]);
+    body.append(tree, footer);
+
+    const selRow = tree.querySelector('.tree-row.selected');
+    if (selRow) setTimeout(() => selRow.scrollIntoView({ block: 'center' }), 0);
+  }
+
+  _renderNode(el, container, depth) {
+    if (el.nodeType !== 1 || (el.hasAttribute && el.hasAttribute('data-inspect-ui'))) return;
+    const kids = [...el.children].filter((c) => !(c.hasAttribute && c.hasAttribute('data-inspect-ui')));
+    const hasKids = kids.length > 0;
+    const expanded = this._expanded.has(el);
+    const pad = depth * 14 + 8;
+
+    const tw = h('span', { class: 'tree-tw' + (hasKids ? '' : ' leaf'),
+      html: hasKids ? (expanded ? TREE_ICONS.caretDown : TREE_ICONS.caretRight) : '' });
+    tw.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!hasKids) return;
+      if (expanded) this._expanded.delete(el); else this._expanded.add(el);
+      this.render();
+    });
+
+    const row = h('div', { class: 'tree-row' + (el === this.selected ? ' selected' : ''),
+      style: { paddingLeft: pad + 'px' } }, [
+      tw, h('span', { class: 'tree-tag', html: tagOpenHtml(el, hasKids && !expanded) }),
+    ]);
+    row.addEventListener('click', () => {
+      this.selected = el;
+      store.set({ selectedEl: el });
+      this.render();
+    });
+    container.append(row);
+
+    if (hasKids && expanded) {
+      kids.forEach((c) => this._renderNode(c, container, depth + 1));
+      container.append(h('div', { class: 'tree-row tree-close', style: { paddingLeft: pad + 'px' } },
+        [h('span', { class: 'tree-tag', html: tagCloseHtml(el) })]));
+    }
   }
 
   _deleteSelected() {
@@ -412,6 +464,28 @@ function weightName(w) { return String(w); }
 function normalizeLine(lh) { return lh === 'normal' ? '1.4' : lh; }
 function parseLenSafe(v) { return v && v !== 'auto' ? v : '0px'; }
 function escapeHtml(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+const TREE_ICONS = {
+  caretRight: '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M3 1.5l4 3.5-4 3.5z"/></svg>',
+  caretDown: '<svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1.5 3h7l-3.5 4z"/></svg>',
+  back: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  pick: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="4"/></svg>',
+};
+function tagOpenHtml(el, showEllipsis) {
+  const tag = el.tagName.toLowerCase();
+  let attrs = '';
+  for (const a of el.attributes) {
+    if (a.name.startsWith('data-inspect')) continue;
+    const val = a.value.length > 40 ? a.value.slice(0, 40) + '…' : a.value;
+    attrs += ` <span class="t-attr">${escapeHtml(a.name)}</span><span class="t-br">=</span><span class="t-val">"${escapeHtml(val)}"</span>`;
+  }
+  let s = `<span class="t-br">&lt;</span><span class="t-tag">${tag}</span>${attrs}<span class="t-br">&gt;</span>`;
+  if (showEllipsis) s += `<span class="t-ell">…</span><span class="t-br">&lt;/</span><span class="t-tag">${tag}</span><span class="t-br">&gt;</span>`;
+  return s;
+}
+function tagCloseHtml(el) {
+  const t = el.tagName.toLowerCase();
+  return `<span class="t-br">&lt;/</span><span class="t-tag">${t}</span><span class="t-br">&gt;</span>`;
+}
 function highlight(css) {
   return escapeHtml(css)
     .replace(/^([^{\n]+)\{/gm, '<span class="sel">$1</span>{')

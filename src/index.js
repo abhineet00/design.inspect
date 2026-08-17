@@ -10,6 +10,7 @@ import { Toolbar } from './ui/toolbar.js';
 import { Tooltip } from './ui/tooltip.js';
 import { TextEditor } from './core/textEdit.js';
 import { DragMove } from './core/dragMove.js';
+import { Responsive } from './core/responsive.js';
 import { css } from './ui/theme.js';
 import { fontFace } from './ui/font.js';
 import { undo, redo } from './core/history.js';
@@ -47,6 +48,7 @@ class App {
     this.inspector = new Inspector(this.overlay, (el) => this.select(el));
     this.textEditor = new TextEditor(() => this.panel.render());
     this.dragMove = new DragMove((el) => { if (el) { this.overlay.select(el); this.panel.render(); } });
+    this.responsive = new Responsive();
     this.textEditor.start();
     this.dragMove.start();
 
@@ -122,10 +124,7 @@ class App {
   }
 
   toggleResponsive() {
-    this._resp = !this._resp;
-    const w = document.documentElement;
-    if (this._resp) { w.style.maxWidth = '420px'; w.style.margin = '0 auto'; w.style.transition = 'max-width .2s'; }
-    else { w.style.maxWidth = ''; w.style.margin = ''; }
+    this.responsive.toggle();
     const s = store.get();
     if (s.selectedEl) this.overlay.select(s.selectedEl);
   }
@@ -135,12 +134,15 @@ class App {
     else if (!s.active && this._picking) { this._picking = false; this.inspector.stop(); }
     if (s.selectedEl && document.contains(s.selectedEl)) this.overlay.select(s.selectedEl);
     else this.overlay.hideSelected();
+    // hide the panel while dragging so the drop target is unobstructed
+    this.panel.el.classList.toggle('drag-hidden', !!s.dragging);
     // dock / undock the panel to the side (pushes page content over)
     if (s.docked !== this._prevDocked) {
       this._prevDocked = s.docked;
       this.panel.el.classList.toggle('docked', s.docked);
       document.documentElement.style.transition = 'margin-right .2s ease';
-      document.documentElement.style.marginRight = s.docked ? '400px' : '';
+      const w = Math.round(this.panel.el.getBoundingClientRect().width) || 340;
+      document.documentElement.style.marginRight = s.docked ? w + 'px' : '';
       this.panel.render();
     }
     // re-render the panel when the view or visibility changes
@@ -160,6 +162,7 @@ class App {
     window.removeEventListener('keydown', this._keyHandler, true);
     this.textEditor.stop();
     this.dragMove.stop();
+    this.responsive.destroy();
     this.inspector.stop();
     this.overlay.destroy();
     this.host.remove();
@@ -179,7 +182,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.7.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.8.0' };
 }
 
 boot();
