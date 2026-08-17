@@ -124,7 +124,8 @@ class App {
   }
 
   toggleResponsive() {
-    this.responsive.toggle();
+    const on = this.responsive.toggle();
+    store.set({ responsive: on });
     const s = store.get();
     if (s.selectedEl) this.overlay.select(s.selectedEl);
   }
@@ -182,7 +183,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.8.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.8.1' };
 }
 
 boot();

@@ -7,21 +7,8 @@ export class Responsive {
   constructor() {
     this.active = false;
     this.width = 0;
-    this.handle = h('div', {
-      'data-inspect-ui': '',
-      style: {
-        position: 'fixed', top: '0', bottom: '0', width: '12px', cursor: 'ew-resize',
-        zIndex: '2147483645', display: 'none',
-      },
-    });
-    this.grip = h('div', {
-      style: {
-        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
-        width: '6px', height: '54px', borderRadius: '4px', background: '#58aeff',
-        boxShadow: '0 0 8px rgba(88,174,255,.7)',
-      },
-    });
-    this.handle.appendChild(this.grip);
+    this.handleR = this._makeHandle();
+    this.handleL = this._makeHandle();
     this.label = h('div', {
       'data-inspect-ui': '',
       style: {
@@ -31,12 +18,33 @@ export class Responsive {
         borderRadius: '8px', border: '1px solid rgba(255,255,255,0.14)', pointerEvents: 'none',
       },
     });
-    document.documentElement.append(this.handle, this.label);
+    document.documentElement.append(this.handleR, this.handleL, this.label);
     this._down = this._down.bind(this);
     this._move = this._move.bind(this);
     this._up = this._up.bind(this);
     this._reposition = this._reposition.bind(this);
-    this.handle.addEventListener('mousedown', this._down);
+    this.handleR.addEventListener('mousedown', this._down);
+    this.handleL.addEventListener('mousedown', this._down);
+  }
+
+  // A draggable edge handle with a centered grip; there is one on each side and
+  // both resize symmetrically about the centered page.
+  _makeHandle() {
+    const handle = h('div', {
+      'data-inspect-ui': '',
+      style: {
+        position: 'fixed', top: '0', bottom: '0', width: '12px', cursor: 'ew-resize',
+        zIndex: '2147483645', display: 'none',
+      },
+    });
+    handle.appendChild(h('div', {
+      style: {
+        position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)',
+        width: '6px', height: '54px', borderRadius: '4px', background: '#58aeff',
+        boxShadow: '0 0 8px rgba(88,174,255,.7)',
+      },
+    }));
+    return handle;
   }
 
   toggle() { this.active ? this.disable() : this.enable(); return this.active; }
@@ -45,7 +53,8 @@ export class Responsive {
     this.active = true;
     this.width = Math.min(1024, window.innerWidth - 40);
     this._apply();
-    this.handle.style.display = 'block';
+    this.handleR.style.display = 'block';
+    this.handleL.style.display = 'block';
     this.label.style.display = 'block';
     window.addEventListener('resize', this._reposition);
   }
@@ -54,7 +63,8 @@ export class Responsive {
     this.active = false;
     const html = document.documentElement;
     html.style.width = ''; html.style.margin = ''; html.style.transition = '';
-    this.handle.style.display = 'none';
+    this.handleR.style.display = 'none';
+    this.handleL.style.display = 'none';
     this.label.style.display = 'none';
     window.removeEventListener('resize', this._reposition);
   }
@@ -68,7 +78,9 @@ export class Responsive {
 
   _reposition() {
     const rightEdge = (window.innerWidth + this.width) / 2;
-    this.handle.style.left = rightEdge - 6 + 'px';
+    const leftEdge = (window.innerWidth - this.width) / 2;
+    this.handleR.style.left = rightEdge - 6 + 'px';
+    this.handleL.style.left = leftEdge - 6 + 'px';
     this.label.textContent = Math.round(this.width) + ' px';
   }
 
@@ -81,7 +93,8 @@ export class Responsive {
   }
   _move(e) {
     if (!this.dragging) return;
-    const w = 2 * (e.clientX - window.innerWidth / 2);
+    // Distance from the cursor to the page centre, doubled, works for either edge.
+    const w = 2 * Math.abs(e.clientX - window.innerWidth / 2);
     this.width = Math.max(320, Math.min(w, window.innerWidth));
     this._apply();
   }
@@ -92,5 +105,5 @@ export class Responsive {
     document.documentElement.style.userSelect = '';
   }
 
-  destroy() { this.disable(); this.handle.remove(); this.label.remove(); }
+  destroy() { this.disable(); this.handleR.remove(); this.handleL.remove(); this.label.remove(); }
 }

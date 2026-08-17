@@ -29,10 +29,20 @@ export function clearLog() {
   store.set({ changeLog: log });
 }
 
+/** Drop every 'move' entry for an element — used when it ends up back where it
+ *  started, so a net-zero reorder never reaches the log or the AI prompt. */
+export function removeMovesFor(id) {
+  const log = store.get().changeLog;
+  const kept = log.filter((e) => !(e.type === 'move' && e.id === id));
+  log.length = 0;
+  log.push(...kept);
+  store.set({ changeLog: log });
+}
+
 /** Human-readable one-liner for a log entry (used in the panel list). */
 export function describe(e) {
   if (e.type === 'text') return `text → "${trim(e.to, 34)}"`;
-  if (e.type === 'move') return 'reordered among siblings';
+  if (e.type === 'move') return e.position ? `moved ${e.position}` : 'reordered among siblings';
   if (e.type === 'delete') return 'removed from the page';
   return `${e.prop}: ${e.to}`;
 }
@@ -48,14 +58,14 @@ export function generateAiPrompt(diff = false) {
   const groups = new Map();
   for (const e of log) {
     const key = e.selector || e.label;
-    if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: new Map(), text: null, moved: false, deleted: false });
+    if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: new Map(), text: null, movedTo: null, deleted: false });
     const g = groups.get(key);
     if (e.type === 'css') {
       const prop = e.pseudo && e.pseudo !== 'none' ? `${e.prop} (:${e.pseudo})` : e.prop;
       const cur = g.css.get(prop);
       g.css.set(prop, { from: cur ? cur.from : e.from, to: e.to }); // first from, last to
     } else if (e.type === 'text') g.text = { from: g.text ? g.text.from : e.from, to: e.to };
-    else if (e.type === 'move') g.moved = true;
+    else if (e.type === 'move') g.movedTo = e.position || 'to a new position'; // last move wins
     else if (e.type === 'delete') g.deleted = true;
   }
 
@@ -74,7 +84,7 @@ export function generateAiPrompt(diff = false) {
         ? `   - change its text from "${g.text.from}" to "${g.text.to}"\n`
         : `   - change its text to: "${g.text.to}"\n`;
     }
-    if (g.moved) out += '   - reorder it among its siblings to match the new layout\n';
+    if (g.movedTo) out += `   - move it ${g.movedTo} (relative to its siblings)\n`;
     i++;
   }
   out += '\nKeep everything else unchanged.';

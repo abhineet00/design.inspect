@@ -24,8 +24,10 @@
     // chronological record of every change made
     promptDiff: false,
     // AI prompt style: false = final state, true = from→to diff
-    docked: false
+    docked: false,
     // panel docked to the right edge as a side panel
+    responsive: false
+    // responsive-width preview active
   };
   var subs = /* @__PURE__ */ new Set();
   var store = {
@@ -347,9 +349,16 @@
     log.length = 0;
     store.set({ changeLog: log });
   }
+  function removeMovesFor(id) {
+    const log = store.get().changeLog;
+    const kept = log.filter((e) => !(e.type === "move" && e.id === id));
+    log.length = 0;
+    log.push(...kept);
+    store.set({ changeLog: log });
+  }
   function describe(e) {
     if (e.type === "text") return `text \u2192 "${trim(e.to, 34)}"`;
-    if (e.type === "move") return "reordered among siblings";
+    if (e.type === "move") return e.position ? `moved ${e.position}` : "reordered among siblings";
     if (e.type === "delete") return "removed from the page";
     return `${e.prop}: ${e.to}`;
   }
@@ -359,14 +368,14 @@
     const groups = /* @__PURE__ */ new Map();
     for (const e of log) {
       const key = e.selector || e.label;
-      if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: /* @__PURE__ */ new Map(), text: null, moved: false, deleted: false });
+      if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: /* @__PURE__ */ new Map(), text: null, movedTo: null, deleted: false });
       const g = groups.get(key);
       if (e.type === "css") {
         const prop = e.pseudo && e.pseudo !== "none" ? `${e.prop} (:${e.pseudo})` : e.prop;
         const cur = g.css.get(prop);
         g.css.set(prop, { from: cur ? cur.from : e.from, to: e.to });
       } else if (e.type === "text") g.text = { from: g.text ? g.text.from : e.from, to: e.to };
-      else if (e.type === "move") g.moved = true;
+      else if (e.type === "move") g.movedTo = e.position || "to a new position";
       else if (e.type === "delete") g.deleted = true;
     }
     let out = "Apply the following design changes to my web page, then return the updated HTML/CSS.\n\n";
@@ -389,7 +398,8 @@
 ` : `   - change its text to: "${g.text.to}"
 `;
       }
-      if (g.moved) out += "   - reorder it among its siblings to match the new layout\n";
+      if (g.movedTo) out += `   - move it ${g.movedTo} (relative to its siblings)
+`;
       i++;
     }
     out += "\nKeep everything else unchanged.";
@@ -964,16 +974,17 @@ ${body}
     // ---------------- Header ----------------
     _head() {
       const st = store.get();
-      if (st.view === "assets") {
+      if (st.view === "assets" || st.view === "changes") {
+        const meta = st.view === "assets" ? { title: "Assets", sub: "Everything this page uses" } : { title: "Changes", sub: "Every edit you make, ready to copy" };
         return h("div", { class: "head" }, [
           h("div", { class: "head-top" }, [
-            h("div", { class: "head-title", text: "Assets" }),
+            h("div", { class: "head-title", text: meta.title }),
             h("div", { class: "head-actions" }, [
               hbtn("minimize-screen", "Close panel", () => store.set({ collapsed: true })),
               hbtn("x", "Close panel", () => store.set({ collapsed: true }))
             ])
           ]),
-          h("div", { class: "crumb", style: { color: "var(--muted)" }, text: "Everything this page uses" })
+          h("div", { class: "crumb", style: { color: "var(--muted)" }, text: meta.sub })
         ]);
       }
       const el = this.selected;
@@ -1350,6 +1361,8 @@ font-weight: ${t.weight};`, "Type style copied")
         ox = r.left;
         oy = r.top;
         this.el.style.right = "auto";
+        this.el.style.left = r.left + "px";
+        this.el.style.top = r.top + "px";
         document.addEventListener("mousemove", move, true);
         document.addEventListener("mouseup", up, true);
         e.preventDefault();
@@ -1473,11 +1486,11 @@ font-weight: ${t.weight};`, "Type style copied")
           return (_b = (_a = this.api).redo) == null ? void 0 : _b.call(_a);
         }),
         sep(),
-        dockBtnHtml(ARROW_UP, "Select parent element", () => {
+        dockBtn("layer-bring-forward", "Select parent element", () => {
           var _a, _b;
           return (_b = (_a = this.api).selectParent) == null ? void 0 : _b.call(_a);
         }),
-        dockBtnHtml(ARROW_DOWN, "Select child element", () => {
+        dockBtn("layer-send-backward", "Select child element", () => {
           var _a, _b;
           return (_b = (_a = this.api).selectChild) == null ? void 0 : _b.call(_a);
         }),
@@ -1489,7 +1502,7 @@ font-weight: ${t.weight};`, "Type style copied")
         this.codeBtn = dockBtn("file-diff", "Changes & AI prompt", () => store.set({ view: "changes", collapsed: false })),
         this.htmlBtn = dockBtn("html-file-01", "HTML", () => store.set({ view: "html", collapsed: false })),
         sep(),
-        dockBtn("laptop-phone-sync", "Toggle responsive preview", () => {
+        this.respBtn = dockBtn("laptop-phone-sync", "Toggle responsive preview", () => {
           var _a, _b;
           return (_b = (_a = this.api).toggleResponsive) == null ? void 0 : _b.call(_a);
         })
@@ -1502,12 +1515,13 @@ font-weight: ${t.weight};`, "Type style copied")
       this.sync();
     }
     sync() {
-      var _a, _b, _c, _d;
+      var _a, _b, _c, _d, _e;
       const s = store.get();
       (_a = this.pauseBtn) == null ? void 0 : _a.classList.toggle("active", s.active);
       (_b = this.assetsBtn) == null ? void 0 : _b.classList.toggle("active", s.view === "assets");
       (_c = this.codeBtn) == null ? void 0 : _c.classList.toggle("active", s.view === "changes");
       (_d = this.htmlBtn) == null ? void 0 : _d.classList.toggle("active", s.view === "html");
+      (_e = this.respBtn) == null ? void 0 : _e.classList.toggle("active", s.responsive);
     }
   };
   function circle(name, title, onClick) {
@@ -1516,11 +1530,6 @@ font-weight: ${t.weight};`, "Type style copied")
   function dockBtn(name, title, onClick) {
     return h("button", { class: "dock-btn", title, onclick: onClick, html: icon(name) });
   }
-  function dockBtnHtml(svg, title, onClick) {
-    return h("button", { class: "dock-btn", title, onclick: onClick, html: svg });
-  }
-  var ARROW_UP = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V4M6 10l6-6 6 6"/></svg>';
-  var ARROW_DOWN = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>';
   function sep() {
     return h("div", { class: "dock-sep" });
   }
@@ -1662,6 +1671,36 @@ font-weight: ${t.weight};`, "Type style copied")
 
   // src/core/dragMove.js
   var THRESHOLD = 4;
+  var ORIG_NEXT = /* @__PURE__ */ new WeakMap();
+  function nextNonUI(el) {
+    let n = el.nextElementSibling;
+    while (n && isOwnUI(n)) n = n.nextElementSibling;
+    return n;
+  }
+  function prevNonUI(el) {
+    let p = el.previousElementSibling;
+    while (p && isOwnUI(p)) p = p.previousElementSibling;
+    return p;
+  }
+  function isRowLayout(siblings, parent) {
+    if (siblings.length >= 2) {
+      const a = siblings[0].getBoundingClientRect();
+      const b = siblings[1].getBoundingClientRect();
+      const vOverlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+      const hOverlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      if (vOverlap !== hOverlap) return vOverlap > hOverlap;
+    }
+    const cs = getComputedStyle(parent);
+    const flexRow = /flex/.test(cs.display) && /row/.test(cs.flexDirection);
+    return flexRow || cs.display.includes("inline") || cs.display === "grid" && cs.gridAutoFlow.includes("column");
+  }
+  function describePosition(el) {
+    const next = nextNonUI(el);
+    if (next) return `before ${elementLabel(next)}`;
+    const prev = prevNonUI(el);
+    if (prev) return `after ${elementLabel(prev)}`;
+    return "to the only remaining slot";
+  }
   var MOVE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
   var DragMove = class {
     constructor(onReorder) {
@@ -1769,8 +1808,7 @@ font-weight: ${t.weight};`, "Type style copied")
         this.indicator.style.display = "none";
         return;
       }
-      const cs = getComputedStyle(parent);
-      const row = /row/.test(cs.flexDirection) || cs.display.includes("inline") || cs.display === "grid" && cs.gridAutoFlow.includes("column");
+      const row = isRowLayout(siblings, parent);
       const pos = row ? e.clientX : e.clientY;
       let ref = null;
       for (const s of siblings) {
@@ -1831,14 +1869,21 @@ font-weight: ${t.weight};`, "Type style copied")
         if (el && ref !== void 0 && ref !== el && ref !== el.nextElementSibling) {
           const parent = el.parentElement;
           const oldNext = el.nextElementSibling;
+          if (!ORIG_NEXT.has(el)) ORIG_NEXT.set(el, nextNonUI(el));
           parent.insertBefore(el, ref || null);
-          logChange({
-            type: "move",
-            id: el.getAttribute("data-inspect-id"),
-            to: "reordered",
-            label: elementLabel(el),
-            selector: cssPath(el)
-          });
+          const id = el.getAttribute("data-inspect-id");
+          if (nextNonUI(el) === ORIG_NEXT.get(el)) {
+            removeMovesFor(id);
+          } else {
+            logChange({
+              type: "move",
+              id,
+              to: "reordered",
+              label: elementLabel(el),
+              selector: cssPath(el),
+              position: describePosition(el)
+            });
+          }
           record({
             undo: () => parent.insertBefore(el, oldNext),
             redo: () => parent.insertBefore(el, ref || null)
@@ -1863,32 +1908,8 @@ font-weight: ${t.weight};`, "Type style copied")
     constructor() {
       this.active = false;
       this.width = 0;
-      this.handle = h("div", {
-        "data-inspect-ui": "",
-        style: {
-          position: "fixed",
-          top: "0",
-          bottom: "0",
-          width: "12px",
-          cursor: "ew-resize",
-          zIndex: "2147483645",
-          display: "none"
-        }
-      });
-      this.grip = h("div", {
-        style: {
-          position: "absolute",
-          top: "50%",
-          left: "50%",
-          transform: "translate(-50%,-50%)",
-          width: "6px",
-          height: "54px",
-          borderRadius: "4px",
-          background: "#58aeff",
-          boxShadow: "0 0 8px rgba(88,174,255,.7)"
-        }
-      });
-      this.handle.appendChild(this.grip);
+      this.handleR = this._makeHandle();
+      this.handleL = this._makeHandle();
       this.label = h("div", {
         "data-inspect-ui": "",
         style: {
@@ -1907,12 +1928,43 @@ font-weight: ${t.weight};`, "Type style copied")
           pointerEvents: "none"
         }
       });
-      document.documentElement.append(this.handle, this.label);
+      document.documentElement.append(this.handleR, this.handleL, this.label);
       this._down = this._down.bind(this);
       this._move = this._move.bind(this);
       this._up = this._up.bind(this);
       this._reposition = this._reposition.bind(this);
-      this.handle.addEventListener("mousedown", this._down);
+      this.handleR.addEventListener("mousedown", this._down);
+      this.handleL.addEventListener("mousedown", this._down);
+    }
+    // A draggable edge handle with a centered grip; there is one on each side and
+    // both resize symmetrically about the centered page.
+    _makeHandle() {
+      const handle = h("div", {
+        "data-inspect-ui": "",
+        style: {
+          position: "fixed",
+          top: "0",
+          bottom: "0",
+          width: "12px",
+          cursor: "ew-resize",
+          zIndex: "2147483645",
+          display: "none"
+        }
+      });
+      handle.appendChild(h("div", {
+        style: {
+          position: "absolute",
+          top: "50%",
+          left: "50%",
+          transform: "translate(-50%,-50%)",
+          width: "6px",
+          height: "54px",
+          borderRadius: "4px",
+          background: "#58aeff",
+          boxShadow: "0 0 8px rgba(88,174,255,.7)"
+        }
+      }));
+      return handle;
     }
     toggle() {
       this.active ? this.disable() : this.enable();
@@ -1922,7 +1974,8 @@ font-weight: ${t.weight};`, "Type style copied")
       this.active = true;
       this.width = Math.min(1024, window.innerWidth - 40);
       this._apply();
-      this.handle.style.display = "block";
+      this.handleR.style.display = "block";
+      this.handleL.style.display = "block";
       this.label.style.display = "block";
       window.addEventListener("resize", this._reposition);
     }
@@ -1932,7 +1985,8 @@ font-weight: ${t.weight};`, "Type style copied")
       html.style.width = "";
       html.style.margin = "";
       html.style.transition = "";
-      this.handle.style.display = "none";
+      this.handleR.style.display = "none";
+      this.handleL.style.display = "none";
       this.label.style.display = "none";
       window.removeEventListener("resize", this._reposition);
     }
@@ -1944,7 +1998,9 @@ font-weight: ${t.weight};`, "Type style copied")
     }
     _reposition() {
       const rightEdge = (window.innerWidth + this.width) / 2;
-      this.handle.style.left = rightEdge - 6 + "px";
+      const leftEdge = (window.innerWidth - this.width) / 2;
+      this.handleR.style.left = rightEdge - 6 + "px";
+      this.handleL.style.left = leftEdge - 6 + "px";
       this.label.textContent = Math.round(this.width) + " px";
     }
     _down(e) {
@@ -1956,7 +2012,7 @@ font-weight: ${t.weight};`, "Type style copied")
     }
     _move(e) {
       if (!this.dragging) return;
-      const w = 2 * (e.clientX - window.innerWidth / 2);
+      const w = 2 * Math.abs(e.clientX - window.innerWidth / 2);
       this.width = Math.max(320, Math.min(w, window.innerWidth));
       this._apply();
     }
@@ -1968,7 +2024,8 @@ font-weight: ${t.weight};`, "Type style copied")
     }
     destroy() {
       this.disable();
-      this.handle.remove();
+      this.handleR.remove();
+      this.handleL.remove();
       this.label.remove();
     }
   };
@@ -2432,7 +2489,8 @@ ${fontFace}
       this.select(next);
     }
     toggleResponsive() {
-      this.responsive.toggle();
+      const on = this.responsive.toggle();
+      store.set({ responsive: on });
       const s = store.get();
       if (s.selectedEl) this.overlay.select(s.selectedEl);
     }
@@ -2492,7 +2550,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.8.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.8.1" };
   }
   boot();
 })();

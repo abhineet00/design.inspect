@@ -5,10 +5,51 @@
 import { store } from './store.js';
 import { h, isOwnUI, elementLabel } from './util.js';
 import { cssPath } from './selector.js';
-import { logChange } from './changeLog.js';
+import { logChange, removeMovesFor } from './changeLog.js';
 import { record } from './history.js';
 
 const THRESHOLD = 4;
+// Remembers where each element sat before the *first* reorder, so a drag that
+// ends back at the start is recognised as a net-zero change.
+const ORIG_NEXT = new WeakMap();
+
+function nextNonUI(el) {
+  let n = el.nextElementSibling;
+  while (n && isOwnUI(n)) n = n.nextElementSibling;
+  return n;
+}
+function prevNonUI(el) {
+  let p = el.previousElementSibling;
+  while (p && isOwnUI(p)) p = p.previousElementSibling;
+  return p;
+}
+// Decide whether siblings are laid out horizontally. Reading flex-direction is
+// unreliable (it's 'row' even on a plain block stack), and comparing raw edges
+// breaks when children are centered/different widths. Instead measure overlap:
+// items placed side by side share a vertical band, stacked items share a
+// horizontal band. Whichever overlap dominates names the layout axis.
+function isRowLayout(siblings, parent) {
+  if (siblings.length >= 2) {
+    const a = siblings[0].getBoundingClientRect();
+    const b = siblings[1].getBoundingClientRect();
+    const vOverlap = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top);
+    const hOverlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
+    if (vOverlap !== hOverlap) return vOverlap > hOverlap;
+  }
+  const cs = getComputedStyle(parent);
+  const flexRow = /flex/.test(cs.display) && /row/.test(cs.flexDirection);
+  return flexRow || cs.display.includes('inline') ||
+    (cs.display === 'grid' && cs.gridAutoFlow.includes('column'));
+}
+
+// Describe an element's slot for the AI prompt: "before X" / "after Y".
+function describePosition(el) {
+  const next = nextNonUI(el);
+  if (next) return `before ${elementLabel(next)}`;
+  const prev = prevNonUI(el);
+  if (prev) return `after ${elementLabel(prev)}`;
+  return 'to the only remaining slot';
+}
 const MOVE_ICON =
   '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
   'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
@@ -104,9 +145,7 @@ export class DragMove {
     const siblings = [...parent.children].filter((c) => !isOwnUI(c) && c !== el);
     if (!siblings.length) { this.ref = undefined; this.indicator.style.display = 'none'; return; }
 
-    const cs = getComputedStyle(parent);
-    const row = /row/.test(cs.flexDirection) || cs.display.includes('inline') ||
-      (cs.display === 'grid' && cs.gridAutoFlow.includes('column'));
+    const row = isRowLayout(siblings, parent);
     const pos = row ? e.clientX : e.clientY;
 
     // Snap to the nearest slot: insert before the first sibling whose centre is
@@ -160,9 +199,17 @@ export class DragMove {
       if (el && ref !== undefined && ref !== el && ref !== el.nextElementSibling) {
         const parent = el.parentElement;
         const oldNext = el.nextElementSibling;
+        // Record the pre-move slot the first time this element is dragged.
+        if (!ORIG_NEXT.has(el)) ORIG_NEXT.set(el, nextNonUI(el));
         parent.insertBefore(el, ref || null);
-        logChange({ type: 'move', id: el.getAttribute('data-inspect-id'), to: 'reordered',
-          label: elementLabel(el), selector: cssPath(el) });
+        const id = el.getAttribute('data-inspect-id');
+        if (nextNonUI(el) === ORIG_NEXT.get(el)) {
+          // Back where it began — cancel out any earlier moves for this element.
+          removeMovesFor(id);
+        } else {
+          logChange({ type: 'move', id, to: 'reordered', label: elementLabel(el),
+            selector: cssPath(el), position: describePosition(el) });
+        }
         record({
           undo: () => parent.insertBefore(el, oldNext),
           redo: () => parent.insertBefore(el, ref || null),

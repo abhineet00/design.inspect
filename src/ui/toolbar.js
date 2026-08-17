@@ -28,8 +28,8 @@ export class Toolbar {
       dockBtn('undo-03', 'Undo', () => this.api.undo?.()),
       dockBtn('redo-01', 'Redo', () => this.api.redo?.()),
       sep(),
-      dockBtnHtml(ARROW_UP, 'Select parent element', () => this.api.selectParent?.()),
-      dockBtnHtml(ARROW_DOWN, 'Select child element', () => this.api.selectChild?.()),
+      dockBtn('layer-bring-forward', 'Select parent element', () => this.api.selectParent?.()),
+      dockBtn('layer-send-backward', 'Select child element', () => this.api.selectChild?.()),
       sep(),
       this.assetsBtn = dockBtn('component', 'Assets (page colors, type, SVGs, images)', () => {
         const v = store.get().view;
@@ -38,7 +38,7 @@ export class Toolbar {
       this.codeBtn = dockBtn('file-diff', 'Changes & AI prompt', () => store.set({ view: 'changes', collapsed: false })),
       this.htmlBtn = dockBtn('html-file-01', 'HTML', () => store.set({ view: 'html', collapsed: false })),
       sep(),
-      dockBtn('laptop-phone-sync', 'Toggle responsive preview', () => this.api.toggleResponsive?.()),
+      this.respBtn = dockBtn('laptop-phone-sync', 'Toggle responsive preview', () => this.api.toggleResponsive?.()),
     ]);
 
     // bottom: close
@@ -54,6 +54,7 @@ export class Toolbar {
     this.assetsBtn?.classList.toggle('active', s.view === 'assets');
     this.codeBtn?.classList.toggle('active', s.view === 'changes');
     this.htmlBtn?.classList.toggle('active', s.view === 'html');
+    this.respBtn?.classList.toggle('active', s.responsive);
   }
 }
 
@@ -63,15 +64,6 @@ function circle(name, title, onClick) {
 function dockBtn(name, title, onClick) {
   return h('button', { class: 'dock-btn', title, onclick: onClick, html: icon(name) });
 }
-function dockBtnHtml(svg, title, onClick) {
-  return h('button', { class: 'dock-btn', title, onclick: onClick, html: svg });
-}
-const ARROW_UP =
-  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-  'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20V4M6 10l6-6 6 6"/></svg>';
-const ARROW_DOWN =
-  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-  'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16M6 14l6 6 6-6"/></svg>';
 function sep() {
   return h('div', { class: 'dock-sep' });
 }

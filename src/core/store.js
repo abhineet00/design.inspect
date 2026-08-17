@@ -15,6 +15,7 @@ const state = {
   changeLog: [],                // chronological record of every change made
   promptDiff: false,            // AI prompt style: false = final state, true = from→to diff
   docked: false,                // panel docked to the right edge as a side panel
+  responsive: false,            // responsive-width preview active
 };
 
 const subs = new Set();

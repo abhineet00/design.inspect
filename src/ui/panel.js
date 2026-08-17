@@ -42,16 +42,20 @@ export class Panel {
   // ---------------- Header ----------------
   _head() {
     const st = store.get();
-    if (st.view === 'assets') {
+    // Assets and Changes are page-level views — a plain title, no element crumb.
+    if (st.view === 'assets' || st.view === 'changes') {
+      const meta = st.view === 'assets'
+        ? { title: 'Assets', sub: 'Everything this page uses' }
+        : { title: 'Changes', sub: 'Every edit you make, ready to copy' };
       return h('div', { class: 'head' }, [
         h('div', { class: 'head-top' }, [
-          h('div', { class: 'head-title', text: 'Assets' }),
+          h('div', { class: 'head-title', text: meta.title }),
           h('div', { class: 'head-actions' }, [
             hbtn('minimize-screen', 'Close panel', () => store.set({ collapsed: true })),
             hbtn('x', 'Close panel', () => store.set({ collapsed: true })),
           ]),
         ]),
-        h('div', { class: 'crumb', style: { color: 'var(--muted)' }, text: 'Everything this page uses' }),
+        h('div', { class: 'crumb', style: { color: 'var(--muted)' }, text: meta.sub }),
       ]);
     }
     const el = this.selected;
@@ -398,7 +402,11 @@ export class Panel {
       dragging = true;
       const r = this.el.getBoundingClientRect();
       sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+      // Pin to the current spot up front. Otherwise clearing `right` without
+      // yet setting `left` snaps the panel to the left edge on a plain click.
       this.el.style.right = 'auto';
+      this.el.style.left = r.left + 'px';
+      this.el.style.top = r.top + 'px';
       document.addEventListener('mousemove', move, true);
       document.addEventListener('mouseup', up, true);
       e.preventDefault();
