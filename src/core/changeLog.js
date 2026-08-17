@@ -31,7 +31,9 @@ export function clearLog() {
 
 /** Human-readable one-liner for a log entry (used in the panel list). */
 export function describe(e) {
-  if (e.type === 'text') return `text → "${trim(e.to, 40)}"`;
+  if (e.type === 'text') return `text → "${trim(e.to, 34)}"`;
+  if (e.type === 'move') return 'reordered among siblings';
+  if (e.type === 'delete') return 'removed from the page';
   return `${e.prop}: ${e.to}`;
 }
 
@@ -39,25 +41,40 @@ export function describe(e) {
  * A plain-language prompt describing the final desired state, grouped by
  * element with the last value kept per property. Copy-paste into any AI.
  */
-export function generateAiPrompt() {
+export function generateAiPrompt(diff = false) {
   const log = getLog();
   if (!log.length) return '';
 
   const groups = new Map();
   for (const e of log) {
     const key = e.selector || e.label;
-    if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: new Map(), text: null });
+    if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: new Map(), text: null, moved: false, deleted: false });
     const g = groups.get(key);
-    if (e.type === 'css') g.css.set(e.pseudo && e.pseudo !== 'none' ? `${e.prop} (:${e.pseudo})` : e.prop, e.to);
-    else g.text = e.to;
+    if (e.type === 'css') {
+      const prop = e.pseudo && e.pseudo !== 'none' ? `${e.prop} (:${e.pseudo})` : e.prop;
+      const cur = g.css.get(prop);
+      g.css.set(prop, { from: cur ? cur.from : e.from, to: e.to }); // first from, last to
+    } else if (e.type === 'text') g.text = { from: g.text ? g.text.from : e.from, to: e.to };
+    else if (e.type === 'move') g.moved = true;
+    else if (e.type === 'delete') g.deleted = true;
   }
 
   let out = 'Apply the following design changes to my web page, then return the updated HTML/CSS.\n\n';
   let i = 1;
   for (const g of groups.values()) {
     out += `${i}. Element \`${g.selector || g.label}\`:\n`;
-    for (const [prop, val] of g.css) out += `   - set ${prop} to ${val}\n`;
-    if (g.text != null) out += `   - change its text to: "${g.text}"\n`;
+    if (g.deleted) { out += '   - remove this element from the page\n'; i++; continue; }
+    for (const [prop, v] of g.css) {
+      out += diff
+        ? `   - change ${prop} from ${v.from || 'default'} to ${v.to}\n`
+        : `   - set ${prop} to ${v.to}\n`;
+    }
+    if (g.text != null) {
+      out += diff
+        ? `   - change its text from "${g.text.from}" to "${g.text.to}"\n`
+        : `   - change its text to: "${g.text.to}"\n`;
+    }
+    if (g.moved) out += '   - reorder it among its siblings to match the new layout\n';
     i++;
   }
   out += '\nKeep everything else unchanged.';

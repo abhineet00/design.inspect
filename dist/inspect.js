@@ -20,8 +20,12 @@
     // inline text editing in progress
     dragging: false,
     // drag-to-reorder in progress
-    changeLog: []
+    changeLog: [],
     // chronological record of every change made
+    promptDiff: false,
+    // AI prompt style: false = final state, true = from→to diff
+    docked: false
+    // panel docked to the right edge as a side panel
   };
   var subs = /* @__PURE__ */ new Set();
   var store = {
@@ -344,29 +348,48 @@
     store.set({ changeLog: log });
   }
   function describe(e) {
-    if (e.type === "text") return `text \u2192 "${trim(e.to, 40)}"`;
+    if (e.type === "text") return `text \u2192 "${trim(e.to, 34)}"`;
+    if (e.type === "move") return "reordered among siblings";
+    if (e.type === "delete") return "removed from the page";
     return `${e.prop}: ${e.to}`;
   }
-  function generateAiPrompt() {
+  function generateAiPrompt(diff = false) {
     const log = getLog();
     if (!log.length) return "";
     const groups = /* @__PURE__ */ new Map();
     for (const e of log) {
       const key = e.selector || e.label;
-      if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: /* @__PURE__ */ new Map(), text: null });
+      if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: /* @__PURE__ */ new Map(), text: null, moved: false, deleted: false });
       const g = groups.get(key);
-      if (e.type === "css") g.css.set(e.pseudo && e.pseudo !== "none" ? `${e.prop} (:${e.pseudo})` : e.prop, e.to);
-      else g.text = e.to;
+      if (e.type === "css") {
+        const prop = e.pseudo && e.pseudo !== "none" ? `${e.prop} (:${e.pseudo})` : e.prop;
+        const cur = g.css.get(prop);
+        g.css.set(prop, { from: cur ? cur.from : e.from, to: e.to });
+      } else if (e.type === "text") g.text = { from: g.text ? g.text.from : e.from, to: e.to };
+      else if (e.type === "move") g.moved = true;
+      else if (e.type === "delete") g.deleted = true;
     }
     let out = "Apply the following design changes to my web page, then return the updated HTML/CSS.\n\n";
     let i = 1;
     for (const g of groups.values()) {
       out += `${i}. Element \`${g.selector || g.label}\`:
 `;
-      for (const [prop, val2] of g.css) out += `   - set ${prop} to ${val2}
+      if (g.deleted) {
+        out += "   - remove this element from the page\n";
+        i++;
+        continue;
+      }
+      for (const [prop, v] of g.css) {
+        out += diff ? `   - change ${prop} from ${v.from || "default"} to ${v.to}
+` : `   - set ${prop} to ${v.to}
 `;
-      if (g.text != null) out += `   - change its text to: "${g.text}"
+      }
+      if (g.text != null) {
+        out += diff ? `   - change its text from "${g.text.from}" to "${g.text.to}"
+` : `   - change its text to: "${g.text.to}"
 `;
+      }
+      if (g.moved) out += "   - reorder it among its siblings to match the new layout\n";
       i++;
     }
     out += "\nKeep everything else unchanged.";
@@ -375,6 +398,30 @@
   function trim(s, n) {
     s = String(s);
     return s.length > n ? s.slice(0, n) + "\u2026" : s;
+  }
+
+  // src/core/history.js
+  var past = [];
+  var future = [];
+  var MAX = 200;
+  function record(action) {
+    past.push(action);
+    if (past.length > MAX) past.shift();
+    future.length = 0;
+  }
+  function undo() {
+    const a = past.pop();
+    if (!a) return null;
+    a.undo();
+    future.push(a);
+    return a;
+  }
+  function redo() {
+    const a = future.pop();
+    if (!a) return null;
+    a.redo();
+    past.push(a);
+    return a;
   }
 
   // src/core/liveStyles.js
@@ -389,8 +436,6 @@
     }
     return el;
   }
-  var past = [];
-  var future = [];
   function snapshot() {
     const { edits } = store.get();
     return [...edits.entries()].map(([k, e]) => [k, {
@@ -400,7 +445,7 @@
       props: [...e.props.entries()]
     }]);
   }
-  function restore(snap) {
+  function applySnapshot(snap) {
     const map = /* @__PURE__ */ new Map();
     for (const [k, e] of snap) {
       map.set(k, { inspectId: e.inspectId, pseudo: e.pseudo, selector: e.selector, props: new Map(e.props) });
@@ -409,24 +454,9 @@
     render();
     store.set({ edits: map });
   }
-  function pushHistory() {
-    past.push(snapshot());
-    if (past.length > 100) past.shift();
-    future.length = 0;
-  }
-  function undo() {
-    if (!past.length) return;
-    future.push(snapshot());
-    restore(past.pop());
-  }
-  function redo() {
-    if (!future.length) return;
-    past.push(snapshot());
-    restore(future.pop());
-  }
   function setProp(el, prop, value) {
     var _a, _b;
-    pushHistory();
+    const before = snapshot();
     const id = ensureInspectId(el);
     const { edits, pseudo } = store.get();
     const key = pseudo === "none" ? id : `${id}::${pseudo}`;
@@ -449,6 +479,8 @@
     if (value !== "" && value != null) {
       logChange({ type: "css", id, prop, from, to: value, pseudo, label: elementLabel(el), selector: entry.selector });
     }
+    const after = snapshot();
+    record({ undo: () => applySnapshot(before), redo: () => applySnapshot(after) });
   }
   function getEditedProps(el, pseudo = "none") {
     const id = el.getAttribute("data-inspect-id");
@@ -482,11 +514,6 @@ ${body}
 }`);
     }
     return out.join("\n\n");
-  }
-  function clearAll() {
-    store.get().edits.clear();
-    render();
-    store.set({ edits: store.get().edits });
   }
 
   // src/core/styleModel.js
@@ -956,10 +983,8 @@ ${body}
         h("div", { class: "head-top" }, [
           h("div", { class: "head-title", text: el ? elementLabel(el) || m.tag : "InspectCSS" }),
           h("div", { class: "head-actions" }, [
-            hbtn("delete02", "Reset all edits", () => {
-              clearAll();
-              this.render();
-            }, "danger"),
+            hbtn("delete02", "Delete this element", () => this._deleteSelected(), "danger"),
+            dockToggleBtn(),
             hbtn("minimize-screen", "Close panel", () => store.set({ collapsed: true })),
             hbtn("x", "Close panel (Exit InspectCSS from the left dock)", () => store.set({ collapsed: true }))
           ])
@@ -1098,9 +1123,10 @@ ${body}
     }
     // ---------------- Changes view (change log + generated CSS + AI prompt) ----------------
     _changes(body) {
+      const st = store.get();
       const log = getLog();
       const cssText = generateCss();
-      const prompt = generateAiPrompt();
+      const prompt = generateAiPrompt(st.promptDiff);
       body.append(h("div", { class: "view-actions" }, [
         h("button", { class: "btn primary", text: "Copy CSS", onclick: () => this._copy() }),
         h("button", { class: "btn", text: "Copy AI prompt", onclick: () => {
@@ -1126,11 +1152,26 @@ ${body}
           ])
         ))
       ));
+      const styleToggle = h("div", { class: "seg-toggle" }, [
+        h("button", { class: "seg-btn" + (!st.promptDiff ? " on" : ""), text: "Final", onclick: () => {
+          store.get().promptDiff = false;
+          store.set({ promptDiff: false });
+          this.render();
+        } }),
+        h("button", { class: "seg-btn" + (st.promptDiff ? " on" : ""), text: "Diff", onclick: () => {
+          store.get().promptDiff = true;
+          store.set({ promptDiff: true });
+          this.render();
+        } })
+      ]);
       body.append(assetSection(
         "AI prompt",
         0,
         h("div", {}, [
-          h("div", { class: "ai-hint", text: "Paste this into any AI to apply these changes to your codebase." }),
+          h("div", { class: "ai-row" }, [
+            h("div", { class: "ai-hint", text: "Paste into any AI to apply these changes." }),
+            styleToggle
+          ]),
           h("pre", { class: "code ai-prompt", text: prompt })
         ])
       ));
@@ -1146,6 +1187,23 @@ ${body}
       const clone = el.cloneNode(false);
       clone.removeAttribute("data-inspect-id");
       body.append(h("pre", { class: "code", html: escapeHtml2(clone.outerHTML.replace(/></, ">\n  \u2026\n<")) }));
+    }
+    _deleteSelected() {
+      const el = this.selected;
+      if (!el) return;
+      const parent = el.parentElement;
+      if (!parent) return;
+      const next = el.nextElementSibling;
+      const label = elementLabel(el);
+      const selector = cssPath(el);
+      el.remove();
+      logChange({ type: "delete", id: el.getAttribute("data-inspect-id"), to: "removed", label, selector });
+      record({ undo: () => parent.insertBefore(el, next), redo: () => el.remove() });
+      const nextSel = parent !== document.body && parent !== document.documentElement ? parent : null;
+      this.selected = nextSel;
+      store.set({ selectedEl: nextSel });
+      this._toast("Element deleted");
+      this.render();
     }
     _copy() {
       var _a;
@@ -1222,7 +1280,7 @@ font-weight: ${t.weight};`, "Type style copied")
       let sx, sy, ox, oy, dragging = false;
       this.el.addEventListener("mousedown", (e) => {
         const head = e.target.closest(".head");
-        if (!head || e.target.closest(".hbtn")) return;
+        if (!head || e.target.closest(".hbtn") || store.get().docked) return;
         dragging = true;
         const r = this.el.getBoundingClientRect();
         sx = e.clientX;
@@ -1248,6 +1306,16 @@ font-weight: ${t.weight};`, "Type style copied")
   };
   function hbtn(name, title, onClick, extra = "") {
     return h("button", { class: "hbtn" + (extra ? " " + extra : ""), title, onclick: onClick, html: icon(name) });
+  }
+  var SIDEBAR_ICON = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16" stroke-linecap="round"/><path d="M18 9l-1.5 3 1.5 3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  function dockToggleBtn() {
+    const docked = store.get().docked;
+    return h("button", {
+      class: "hbtn" + (docked ? " active" : ""),
+      title: docked ? "Undock panel (float)" : "Dock panel to the side",
+      onclick: () => store.set({ docked: !store.get().docked }),
+      html: SIDEBAR_ICON
+    });
   }
   function addRow(label, onAdd) {
     return h("div", { class: "addrow" }, [
@@ -1377,10 +1445,15 @@ font-weight: ${t.weight};`, "Type style copied")
       root.addEventListener("pointerover", (e) => this._over(e), true);
       root.addEventListener("pointerout", (e) => this._out(e), true);
       root.addEventListener("pointerdown", () => this.hide(), true);
+      document.addEventListener("pointerover", (e) => this._over(e, true), true);
+      document.addEventListener("pointerout", (e) => this._out(e), true);
+      document.addEventListener("pointerdown", () => this.hide(), true);
     }
-    _over(e) {
+    _over(e, lightDom = false) {
       const t = e.target.closest && e.target.closest("[title],[data-tip]");
-      if (!t || !this.root.contains(t)) return;
+      if (!t) return;
+      if (lightDom && !t.hasAttribute("data-inspect-ui")) return;
+      if (!lightDom && !this.root.contains(t)) return;
       if (t.hasAttribute("title")) {
         const v = t.getAttribute("title");
         if (v) t.setAttribute("data-tip", v);
@@ -1476,14 +1549,20 @@ font-weight: ${t.weight};`, "Type style copied")
         el.removeAttribute("data-inspect-editing");
         const now = el.textContent;
         if (now !== this._origText) {
+          const from = this._origText, to = now;
           logChange({
             type: "text",
             id: el.getAttribute("data-inspect-id"),
-            from: this._origText,
-            to: now,
+            from,
+            to,
             label: elementLabel(el),
             selector: cssPath(el)
           });
+          record({ undo: () => {
+            el.textContent = from;
+          }, redo: () => {
+            el.textContent = to;
+          } });
         }
         this.el = null;
       }
@@ -1595,35 +1674,55 @@ font-weight: ${t.weight};`, "Type style copied")
       const el = store.get().selectedEl;
       const parent = el == null ? void 0 : el.parentElement;
       if (!parent) return;
-      const siblings = [...parent.children].filter((c) => !isOwnUI(c));
-      const under = document.elementFromPoint(e.clientX, e.clientY);
-      const sib = siblings.find((s) => s === under || s.contains(under));
-      if (!sib || sib === el) {
+      const siblings = [...parent.children].filter((c) => !isOwnUI(c) && c !== el);
+      if (!siblings.length) {
         this.ref = void 0;
         this.indicator.style.display = "none";
         return;
       }
       const cs = getComputedStyle(parent);
       const row = /row/.test(cs.flexDirection) || cs.display.includes("inline") || cs.display === "grid" && cs.gridAutoFlow.includes("column");
-      const r = sib.getBoundingClientRect();
-      const after = row ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
-      this.ref = after ? sib.nextElementSibling : sib;
+      const pos = row ? e.clientX : e.clientY;
+      let ref = null;
+      for (const s of siblings) {
+        const r = s.getBoundingClientRect();
+        const centre = row ? r.left + r.width / 2 : r.top + r.height / 2;
+        if (pos < centre) {
+          ref = s;
+          break;
+        }
+      }
+      this.ref = ref;
+      this._drawLine(ref, siblings, row);
+    }
+    _drawLine(ref, siblings, row) {
+      const last = siblings[siblings.length - 1];
+      const target = ref || last;
+      const tr = target.getBoundingClientRect();
       if (row) {
-        const x = after ? r.right : r.left;
+        let x;
+        if (ref) {
+          const prev = siblings[siblings.indexOf(ref) - 1];
+          x = prev ? (prev.getBoundingClientRect().right + tr.left) / 2 : tr.left - 2;
+        } else x = tr.right + 2;
         Object.assign(this.indicator.style, {
           display: "block",
           left: x - 1.5 + "px",
-          top: r.top + "px",
+          top: tr.top + "px",
           width: "3px",
-          height: r.height + "px"
+          height: tr.height + "px"
         });
       } else {
-        const y = after ? r.bottom : r.top;
+        let y;
+        if (ref) {
+          const prev = siblings[siblings.indexOf(ref) - 1];
+          y = prev ? (prev.getBoundingClientRect().bottom + tr.top) / 2 : tr.top - 2;
+        } else y = tr.bottom + 2;
         Object.assign(this.indicator.style, {
           display: "block",
-          left: r.left + "px",
+          left: tr.left + "px",
           top: y - 1.5 + "px",
-          width: r.width + "px",
+          width: tr.width + "px",
           height: "3px"
         });
       }
@@ -1639,8 +1738,22 @@ font-weight: ${t.weight};`, "Type style copied")
       this.dragging = false;
       if (wasDragging) {
         const el = store.get().selectedEl;
-        if (el && this.ref !== void 0 && this.ref !== el) {
-          el.parentElement.insertBefore(el, this.ref || null);
+        const ref = this.ref;
+        if (el && ref !== void 0 && ref !== el && ref !== el.nextElementSibling) {
+          const parent = el.parentElement;
+          const oldNext = el.nextElementSibling;
+          parent.insertBefore(el, ref || null);
+          logChange({
+            type: "move",
+            id: el.getAttribute("data-inspect-id"),
+            to: "reordered",
+            label: elementLabel(el),
+            selector: cssPath(el)
+          });
+          record({
+            undo: () => parent.insertBefore(el, oldNext),
+            redo: () => parent.insertBefore(el, ref || null)
+          });
         }
         store.set({ dragging: false });
         this.ref = void 0;
@@ -1723,6 +1836,12 @@ ${fontFace}
   z-index: 2147483646;
 }
 .panel.hidden { display: none; }
+.panel.docked {
+  top: 0; right: 0; bottom: 0; width: 400px; max-height: 100vh; height: 100vh;
+  border-radius: 0; border-left: 1px solid var(--tool-border);
+  box-shadow: -12px 0 40px rgba(0,0,0,0.5);
+}
+.panel.docked .head { cursor: default; }
 
 .panel-body { padding: 0 17px 17px; overflow-y: auto; overflow-x: hidden; }
 .panel-body::-webkit-scrollbar { width: 10px; }
@@ -1741,6 +1860,7 @@ ${fontFace}
 }
 .hbtn:hover { opacity: 1; }
 .hbtn.danger { color: #e05151; opacity: 1; }
+.hbtn.active { color: var(--blue); opacity: 1; }
 .hbtn svg { width: 20px; height: 20px; }
 .crumb { color: var(--orange); font-size: 18px; font-weight: 500; margin-top: 2px; display: flex; gap: 8px; flex-wrap: wrap; }
 .dims { color: var(--muted); font-size: 20px; margin-top: 6px; display: flex; gap: 12px; align-items: baseline; }
@@ -1930,8 +2050,13 @@ ${fontFace}
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .log-desc { color: var(--text); font-size: 14px; font-family: ui-monospace, Menlo, monospace;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ai-hint { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+.ai-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.ai-hint { color: var(--muted); font-size: 14px; }
 .ai-prompt { white-space: pre-wrap; color: #cdd3e0; font-size: 12.5px; }
+.seg-toggle { display: inline-flex; background: var(--field); border-radius: 8px; padding: 2px; flex: none; }
+.seg-btn { background: none; border: none; color: var(--muted); font-family: var(--font); font-weight: 500;
+  font-size: 13px; padding: 4px 12px; border-radius: 6px; cursor: pointer; }
+.seg-btn.on { background: var(--field-active); color: var(--text); }
 
 /* ---------- Custom dropdown ---------- */
 .field.select-like.open { border-color: var(--blue); }
@@ -1998,11 +2123,11 @@ ${fontFace}
       this.toolbar = new Toolbar(wrap, {
         undo: () => {
           undo();
-          this.panel.render();
+          this._afterHistory();
         },
         redo: () => {
           redo();
-          this.panel.render();
+          this._afterHistory();
         },
         selectParent: () => this.selectRelative("parent"),
         selectChild: () => this.selectRelative("child"),
@@ -2020,6 +2145,7 @@ ${fontFace}
       this.dragMove.start();
       this._prevView = store.get().view;
       this._prevCollapsed = store.get().collapsed;
+      this._prevDocked = store.get().docked;
       this.unsub = store.subscribe((s) => this.onState(s));
       this._track = () => {
         if (this._raf) return;
@@ -2032,6 +2158,8 @@ ${fontFace}
       };
       window.addEventListener("scroll", this._track, true);
       window.addEventListener("resize", this._track, true);
+      this._keyHandler = (e) => this._onKey(e);
+      window.addEventListener("keydown", this._keyHandler, true);
       store.set({ active: true });
       this.panel.render();
     }
@@ -2039,6 +2167,34 @@ ${fontFace}
       store.set({ selectedEl: el, collapsed: false, view: "design" });
       this.overlay.select(el);
       this.panel.set(el);
+    }
+    // After an undo/redo: keep overlay + panel in sync with the restored state.
+    _afterHistory() {
+      const s = store.get();
+      if (s.selectedEl && document.contains(s.selectedEl)) this.overlay.select(s.selectedEl);
+      else {
+        this.overlay.hideSelected();
+        store.set({ selectedEl: null });
+      }
+      this.panel.render();
+    }
+    _onKey(e) {
+      if (store.get().editing) return;
+      const tag = (e.target.tagName || "").toLowerCase();
+      if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+        this._afterHistory();
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+        this._afterHistory();
+      }
     }
     // Navigate the DOM: select the parent, or the first element child.
     selectRelative(dir) {
@@ -2077,7 +2233,15 @@ ${fontFace}
         this._picking = false;
         this.inspector.stop();
       }
-      if (s.selectedEl) this.overlay.select(s.selectedEl);
+      if (s.selectedEl && document.contains(s.selectedEl)) this.overlay.select(s.selectedEl);
+      else this.overlay.hideSelected();
+      if (s.docked !== this._prevDocked) {
+        this._prevDocked = s.docked;
+        this.panel.el.classList.toggle("docked", s.docked);
+        document.documentElement.style.transition = "margin-right .2s ease";
+        document.documentElement.style.marginRight = s.docked ? "400px" : "";
+        this.panel.render();
+      }
       if (s.view !== this._prevView || s.collapsed !== this._prevCollapsed) {
         if (s.view === "assets" && this._prevView !== "assets") this.panel._assetCache = null;
         this._prevView = s.view;
@@ -2090,6 +2254,7 @@ ${fontFace}
       (_a = this.unsub) == null ? void 0 : _a.call(this);
       window.removeEventListener("scroll", this._track, true);
       window.removeEventListener("resize", this._track, true);
+      window.removeEventListener("keydown", this._keyHandler, true);
       this.textEditor.stop();
       this.dragMove.stop();
       this.inspector.stop();
@@ -2104,6 +2269,7 @@ ${fontFace}
     toggleResponsiveOff() {
       document.documentElement.style.maxWidth = "";
       document.documentElement.style.margin = "";
+      document.documentElement.style.marginRight = "";
     }
   };
   function boot() {
@@ -2112,7 +2278,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.6.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.7.0" };
   }
   boot();
 })();

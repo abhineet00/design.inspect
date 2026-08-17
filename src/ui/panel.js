@@ -6,7 +6,9 @@ import { h, round, elementLabel } from '../core/util.js';
 import { readModel, composeTransform } from '../core/styleModel.js';
 import { setProp, generateCss, clearAll } from '../core/liveStyles.js';
 import { collectAll } from '../core/assets.js';
-import { getLog, describe, generateAiPrompt, clearLog } from '../core/changeLog.js';
+import { getLog, describe, generateAiPrompt, clearLog, logChange } from '../core/changeLog.js';
+import { cssPath } from '../core/selector.js';
+import { record } from '../core/history.js';
 import { icon } from '../icons/index.js';
 import {
   field, selectField, iconButtons, colorLine, section, labeled, spacingBox,
@@ -59,7 +61,8 @@ export class Panel {
       h('div', { class: 'head-top' }, [
         h('div', { class: 'head-title', text: el ? elementLabel(el) || m.tag : 'InspectCSS' }),
         h('div', { class: 'head-actions' }, [
-          hbtn('delete02', 'Reset all edits', () => { clearAll(); this.render(); }, 'danger'),
+          hbtn('delete02', 'Delete this element', () => this._deleteSelected(), 'danger'),
+          dockToggleBtn(),
           hbtn('minimize-screen', 'Close panel', () => store.set({ collapsed: true })),
           hbtn('x', 'Close panel (Exit InspectCSS from the left dock)', () => store.set({ collapsed: true })),
         ]),
@@ -190,9 +193,10 @@ export class Panel {
 
   // ---------------- Changes view (change log + generated CSS + AI prompt) ----------------
   _changes(body) {
+    const st = store.get();
     const log = getLog();
     const cssText = generateCss();
-    const prompt = generateAiPrompt();
+    const prompt = generateAiPrompt(st.promptDiff);
 
     body.append(h('div', { class: 'view-actions' }, [
       h('button', { class: 'btn primary', text: 'Copy CSS', onclick: () => this._copy() }),
@@ -217,10 +221,17 @@ export class Panel {
       ))
     ));
 
-    // AI prompt preview
+    // AI prompt preview (with a Final / Diff style toggle)
+    const styleToggle = h('div', { class: 'seg-toggle' }, [
+      h('button', { class: 'seg-btn' + (!st.promptDiff ? ' on' : ''), text: 'Final', onclick: () => { store.get().promptDiff = false; store.set({ promptDiff: false }); this.render(); } }),
+      h('button', { class: 'seg-btn' + (st.promptDiff ? ' on' : ''), text: 'Diff', onclick: () => { store.get().promptDiff = true; store.set({ promptDiff: true }); this.render(); } }),
+    ]);
     body.append(assetSection('AI prompt', 0,
       h('div', {}, [
-        h('div', { class: 'ai-hint', text: 'Paste this into any AI to apply these changes to your codebase.' }),
+        h('div', { class: 'ai-row' }, [
+          h('div', { class: 'ai-hint', text: 'Paste into any AI to apply these changes.' }),
+          styleToggle,
+        ]),
         h('pre', { class: 'code ai-prompt', text: prompt }),
       ])
     ));
@@ -238,6 +249,24 @@ export class Panel {
     const clone = el.cloneNode(false);
     clone.removeAttribute('data-inspect-id');
     body.append(h('pre', { class: 'code', html: escapeHtml(clone.outerHTML.replace(/></, '>\n  …\n<')) }));
+  }
+
+  _deleteSelected() {
+    const el = this.selected;
+    if (!el) return;
+    const parent = el.parentElement;
+    if (!parent) return;
+    const next = el.nextElementSibling;
+    const label = elementLabel(el);
+    const selector = cssPath(el);
+    el.remove();
+    logChange({ type: 'delete', id: el.getAttribute('data-inspect-id'), to: 'removed', label, selector });
+    record({ undo: () => parent.insertBefore(el, next), redo: () => el.remove() });
+    const nextSel = parent !== document.body && parent !== document.documentElement ? parent : null;
+    this.selected = nextSel;
+    store.set({ selectedEl: nextSel });
+    this._toast('Element deleted');
+    this.render();
   }
 
   _copy() {
@@ -313,7 +342,7 @@ export class Panel {
     let sx, sy, ox, oy, dragging = false;
     this.el.addEventListener('mousedown', (e) => {
       const head = e.target.closest('.head');
-      if (!head || e.target.closest('.hbtn')) return;
+      if (!head || e.target.closest('.hbtn') || store.get().docked) return;
       dragging = true;
       const r = this.el.getBoundingClientRect();
       sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
@@ -334,6 +363,19 @@ export class Panel {
 // ---- helpers ----
 function hbtn(name, title, onClick, extra = '') {
   return h('button', { class: 'hbtn' + (extra ? ' ' + extra : ''), title, onclick: onClick, html: icon(name) });
+}
+const SIDEBAR_ICON =
+  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="3"/>' +
+  '<path d="M15 4v16" stroke-linecap="round"/><path d="M18 9l-1.5 3 1.5 3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function dockToggleBtn() {
+  const docked = store.get().docked;
+  return h('button', {
+    class: 'hbtn' + (docked ? ' active' : ''),
+    title: docked ? 'Undock panel (float)' : 'Dock panel to the side',
+    onclick: () => store.set({ docked: !store.get().docked }),
+    html: SIDEBAR_ICON,
+  });
 }
 function addRow(label, onAdd) {
   return h('div', { class: 'addrow' }, [

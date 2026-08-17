@@ -13,6 +13,8 @@ const state = {
   editing: false,               // inline text editing in progress
   dragging: false,              // drag-to-reorder in progress
   changeLog: [],                // chronological record of every change made
+  promptDiff: false,            // AI prompt style: false = final state, true = from→to diff
+  docked: false,                // panel docked to the right edge as a side panel
 };
 
 const subs = new Set();

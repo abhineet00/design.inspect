@@ -12,11 +12,18 @@ export class Tooltip {
     root.addEventListener('pointerover', (e) => this._over(e), true);
     root.addEventListener('pointerout', (e) => this._out(e), true);
     root.addEventListener('pointerdown', () => this.hide(), true);
+    // Also cover our light-DOM UI (e.g. the drag handle) so its tooltip matches.
+    document.addEventListener('pointerover', (e) => this._over(e, true), true);
+    document.addEventListener('pointerout', (e) => this._out(e), true);
+    document.addEventListener('pointerdown', () => this.hide(), true);
   }
 
-  _over(e) {
+  _over(e, lightDom = false) {
     const t = e.target.closest && e.target.closest('[title],[data-tip]');
-    if (!t || !this.root.contains(t)) return;
+    if (!t) return;
+    // In light DOM, only act on our own UI elements.
+    if (lightDom && !t.hasAttribute('data-inspect-ui')) return;
+    if (!lightDom && !this.root.contains(t)) return;
     // Move the native title out of the way so the browser tooltip never appears.
     if (t.hasAttribute('title')) {
       const v = t.getAttribute('title');

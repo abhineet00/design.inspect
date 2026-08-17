@@ -6,6 +6,7 @@ import { store } from './store.js';
 import { isOwnUI, ensureInspectId, elementLabel } from './util.js';
 import { cssPath } from './selector.js';
 import { logChange } from './changeLog.js';
+import { record } from './history.js';
 
 export class TextEditor {
   constructor(onChange) {
@@ -78,10 +79,12 @@ export class TextEditor {
       el.removeAttribute('data-inspect-editing');
       const now = el.textContent;
       if (now !== this._origText) {
+        const from = this._origText, to = now;
         logChange({
           type: 'text', id: el.getAttribute('data-inspect-id'),
-          from: this._origText, to: now, label: elementLabel(el), selector: cssPath(el),
+          from, to, label: elementLabel(el), selector: cssPath(el),
         });
+        record({ undo: () => { el.textContent = from; }, redo: () => { el.textContent = to; } });
       }
       this.el = null;
     }

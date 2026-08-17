@@ -12,7 +12,7 @@ import { TextEditor } from './core/textEdit.js';
 import { DragMove } from './core/dragMove.js';
 import { css } from './ui/theme.js';
 import { fontFace } from './ui/font.js';
-import { undo, redo } from './core/liveStyles.js';
+import { undo, redo } from './core/history.js';
 
 class App {
   constructor() {
@@ -38,8 +38,8 @@ class App {
     this.panel = new Panel(wrap);
     this.tooltip = new Tooltip(wrap);
     this.toolbar = new Toolbar(wrap, {
-      undo: () => { undo(); this.panel.render(); },
-      redo: () => { redo(); this.panel.render(); },
+      undo: () => { undo(); this._afterHistory(); },
+      redo: () => { redo(); this._afterHistory(); },
       selectParent: () => this.selectRelative('parent'),
       selectChild: () => this.selectRelative('child'),
       toggleResponsive: () => this.toggleResponsive(),
@@ -52,6 +52,7 @@ class App {
 
     this._prevView = store.get().view;
     this._prevCollapsed = store.get().collapsed;
+    this._prevDocked = store.get().docked;
     this.unsub = store.subscribe((s) => this.onState(s));
 
     // Keep the hover/selection overlays glued to their elements while the page
@@ -67,6 +68,8 @@ class App {
     };
     window.addEventListener('scroll', this._track, true);
     window.addEventListener('resize', this._track, true);
+    this._keyHandler = (e) => this._onKey(e);
+    window.addEventListener('keydown', this._keyHandler, true);
 
     store.set({ active: true });
     this.panel.render();
@@ -79,6 +82,27 @@ class App {
     store.set({ selectedEl: el, collapsed: false, view: 'design' });
     this.overlay.select(el);
     this.panel.set(el);
+  }
+
+  // After an undo/redo: keep overlay + panel in sync with the restored state.
+  _afterHistory() {
+    const s = store.get();
+    if (s.selectedEl && document.contains(s.selectedEl)) this.overlay.select(s.selectedEl);
+    else { this.overlay.hideSelected(); store.set({ selectedEl: null }); }
+    this.panel.render();
+  }
+
+  _onKey(e) {
+    if (store.get().editing) return; // let contentEditable handle its own undo
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+      e.preventDefault();
+      if (e.shiftKey) { redo(); } else { undo(); }
+      this._afterHistory();
+    } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+      e.preventDefault(); redo(); this._afterHistory();
+    }
   }
 
   // Navigate the DOM: select the parent, or the first element child.
@@ -109,7 +133,16 @@ class App {
   onState(s) {
     if (s.active && !this._picking) { this._picking = true; this.inspector.start(); }
     else if (!s.active && this._picking) { this._picking = false; this.inspector.stop(); }
-    if (s.selectedEl) this.overlay.select(s.selectedEl);
+    if (s.selectedEl && document.contains(s.selectedEl)) this.overlay.select(s.selectedEl);
+    else this.overlay.hideSelected();
+    // dock / undock the panel to the side (pushes page content over)
+    if (s.docked !== this._prevDocked) {
+      this._prevDocked = s.docked;
+      this.panel.el.classList.toggle('docked', s.docked);
+      document.documentElement.style.transition = 'margin-right .2s ease';
+      document.documentElement.style.marginRight = s.docked ? '400px' : '';
+      this.panel.render();
+    }
     // re-render the panel when the view or visibility changes
     if (s.view !== this._prevView || s.collapsed !== this._prevCollapsed) {
       // fresh scan each time the Assets view opens
@@ -124,6 +157,7 @@ class App {
     this.unsub?.();
     window.removeEventListener('scroll', this._track, true);
     window.removeEventListener('resize', this._track, true);
+    window.removeEventListener('keydown', this._keyHandler, true);
     this.textEditor.stop();
     this.dragMove.stop();
     this.inspector.stop();
@@ -138,13 +172,14 @@ class App {
   toggleResponsiveOff() {
     document.documentElement.style.maxWidth = '';
     document.documentElement.style.margin = '';
+    document.documentElement.style.marginRight = '';
   }
 }
 
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.6.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.7.0' };
 }
 
 boot();

@@ -5,6 +5,7 @@ import { store } from './store.js';
 import { ensureInspectId, inspectIdSelector, elementLabel } from './util.js';
 import { cssPath } from './selector.js';
 import { logChange } from './changeLog.js';
+import { record } from './history.js';
 
 const STYLE_ID = 'inspect-css-live-styles';
 
@@ -19,10 +20,7 @@ function styleEl() {
   return el;
 }
 
-// ---- Undo / redo history (snapshots of the edits map) ----
-const past = [];
-const future = [];
-
+// ---- edits-map snapshots (used to make CSS edits undoable) ----
 function snapshot() {
   const { edits } = store.get();
   return [...edits.entries()].map(([k, e]) => [k, {
@@ -30,7 +28,7 @@ function snapshot() {
     props: [...e.props.entries()],
   }]);
 }
-function restore(snap) {
+function applySnapshot(snap) {
   const map = new Map();
   for (const [k, e] of snap) {
     map.set(k, { inspectId: e.inspectId, pseudo: e.pseudo, selector: e.selector, props: new Map(e.props) });
@@ -39,26 +37,10 @@ function restore(snap) {
   render();
   store.set({ edits: map });
 }
-function pushHistory() {
-  past.push(snapshot());
-  if (past.length > 100) past.shift();
-  future.length = 0;
-}
-export function undo() {
-  if (!past.length) return;
-  future.push(snapshot());
-  restore(past.pop());
-}
-export function redo() {
-  if (!future.length) return;
-  past.push(snapshot());
-  restore(future.pop());
-}
-export function canUndo() { return past.length > 0; }
 
 /** Record + apply one property edit on an element. */
 export function setProp(el, prop, value) {
-  pushHistory();
+  const before = snapshot();
   const id = ensureInspectId(el);
   const { edits, pseudo } = store.get();
   const key = pseudo === 'none' ? id : `${id}::${pseudo}`;
@@ -82,6 +64,8 @@ export function setProp(el, prop, value) {
   if (value !== '' && value != null) {
     logChange({ type: 'css', id, prop, from, to: value, pseudo, label: elementLabel(el), selector: entry.selector });
   }
+  const after = snapshot();
+  record({ undo: () => applySnapshot(before), redo: () => applySnapshot(after) });
 }
 
 export function getEditedProps(el, pseudo = 'none') {

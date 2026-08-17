@@ -3,7 +3,10 @@
 // (flex/grid/list); a drop indicator shows where it will land.
 
 import { store } from './store.js';
-import { h, isOwnUI } from './util.js';
+import { h, isOwnUI, elementLabel } from './util.js';
+import { cssPath } from './selector.js';
+import { logChange } from './changeLog.js';
+import { record } from './history.js';
 
 const THRESHOLD = 4;
 const MOVE_ICON =
@@ -97,27 +100,48 @@ export class DragMove {
     const el = store.get().selectedEl;
     const parent = el?.parentElement;
     if (!parent) return;
-    const siblings = [...parent.children].filter((c) => !isOwnUI(c));
-    const under = document.elementFromPoint(e.clientX, e.clientY);
-    const sib = siblings.find((s) => s === under || s.contains(under));
-    if (!sib || sib === el) { this.ref = undefined; this.indicator.style.display = 'none'; return; }
+    // siblings excluding the dragged element and our own UI
+    const siblings = [...parent.children].filter((c) => !isOwnUI(c) && c !== el);
+    if (!siblings.length) { this.ref = undefined; this.indicator.style.display = 'none'; return; }
 
     const cs = getComputedStyle(parent);
     const row = /row/.test(cs.flexDirection) || cs.display.includes('inline') ||
       (cs.display === 'grid' && cs.gridAutoFlow.includes('column'));
-    const r = sib.getBoundingClientRect();
-    const after = row ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
-    this.ref = after ? sib.nextElementSibling : sib;
+    const pos = row ? e.clientX : e.clientY;
 
+    // Snap to the nearest slot: insert before the first sibling whose centre is
+    // past the cursor (so the line marks where the element will *start*).
+    let ref = null;
+    for (const s of siblings) {
+      const r = s.getBoundingClientRect();
+      const centre = row ? r.left + r.width / 2 : r.top + r.height / 2;
+      if (pos < centre) { ref = s; break; }
+    }
+    this.ref = ref; // null => append at the end
+    this._drawLine(ref, siblings, row);
+  }
+
+  _drawLine(ref, siblings, row) {
+    const last = siblings[siblings.length - 1];
+    const target = ref || last;
+    const tr = target.getBoundingClientRect();
     if (row) {
-      const x = after ? r.right : r.left;
+      let x;
+      if (ref) {
+        const prev = siblings[siblings.indexOf(ref) - 1];
+        x = prev ? (prev.getBoundingClientRect().right + tr.left) / 2 : tr.left - 2;
+      } else x = tr.right + 2;
       Object.assign(this.indicator.style, {
-        display: 'block', left: x - 1.5 + 'px', top: r.top + 'px', width: '3px', height: r.height + 'px',
+        display: 'block', left: x - 1.5 + 'px', top: tr.top + 'px', width: '3px', height: tr.height + 'px',
       });
     } else {
-      const y = after ? r.bottom : r.top;
+      let y;
+      if (ref) {
+        const prev = siblings[siblings.indexOf(ref) - 1];
+        y = prev ? (prev.getBoundingClientRect().bottom + tr.top) / 2 : tr.top - 2;
+      } else y = tr.bottom + 2;
       Object.assign(this.indicator.style, {
-        display: 'block', left: r.left + 'px', top: y - 1.5 + 'px', width: r.width + 'px', height: '3px',
+        display: 'block', left: tr.left + 'px', top: y - 1.5 + 'px', width: tr.width + 'px', height: '3px',
       });
     }
   }
@@ -132,8 +156,17 @@ export class DragMove {
 
     if (wasDragging) {
       const el = store.get().selectedEl;
-      if (el && this.ref !== undefined && this.ref !== el) {
-        el.parentElement.insertBefore(el, this.ref || null);
+      const ref = this.ref;
+      if (el && ref !== undefined && ref !== el && ref !== el.nextElementSibling) {
+        const parent = el.parentElement;
+        const oldNext = el.nextElementSibling;
+        parent.insertBefore(el, ref || null);
+        logChange({ type: 'move', id: el.getAttribute('data-inspect-id'), to: 'reordered',
+          label: elementLabel(el), selector: cssPath(el) });
+        record({
+          undo: () => parent.insertBefore(el, oldNext),
+          redo: () => parent.insertBefore(el, ref || null),
+        });
       }
       store.set({ dragging: false });
       this.ref = undefined;
