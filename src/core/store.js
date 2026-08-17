@@ -10,6 +10,8 @@ const state = {
   edits: new Map(),
   panelPos: { x: null, y: 16 }, // panel screen position (null x = right-docked)
   collapsed: false,
+  editing: false,               // inline text editing in progress
+  dragging: false,              // drag-to-reorder in progress
 };
 
 const subs = new Set();

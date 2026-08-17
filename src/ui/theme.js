@@ -21,6 +21,7 @@ ${fontFace}
   --line: #505050;
   --divider: rgba(255, 255, 255, 0.07);
   --border-soft: #afafaf;
+  --tool-border: rgba(255, 255, 255, 0.12);
   --tool-bg: rgba(0, 0, 0, 0.6);
   --tool-active: #353539;
   --text: #ffffff;
@@ -238,13 +239,13 @@ ${fontFace}
 .dock-circle {
   width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center;
   background: var(--tool-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border: 1px solid var(--border-soft); color: var(--text); cursor: pointer;
+  border: 1px solid var(--tool-border); color: var(--text); cursor: pointer;
 }
 .dock-circle:hover { background: var(--tool-active); }
 .dock-group {
   display: flex; flex-direction: column; align-items: center;
   background: var(--tool-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border: 1px solid var(--border-soft); border-radius: 22px; padding: 4px; gap: 0;
+  border: 1px solid var(--tool-border); border-radius: 22px; padding: 4px; gap: 0;
 }
 .dock-btn {
   width: 44px; height: 44px; display: grid; place-items: center; border-radius: 18px;
@@ -254,6 +255,18 @@ ${fontFace}
 .dock-btn.active { background: var(--tool-active); }
 .dock-btn svg, .dock-circle svg { width: 20px; height: 20px; }
 .dock-sep { width: 24px; height: 1px; background: var(--line); margin: 1px 0; }
+
+/* ---------- Custom tooltip ---------- */
+.tooltip {
+  position: fixed; z-index: 2147483647; pointer-events: none;
+  background: #1b1b1b; color: var(--text);
+  border: 1px solid var(--tool-border);
+  font-family: var(--font); font-size: 12px; font-weight: 500;
+  padding: 5px 9px; border-radius: 8px; white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(2px); transition: opacity .1s, transform .1s;
+}
+.tooltip.show { opacity: 1; transform: translateY(0); }
 
 /* toast */
 .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);

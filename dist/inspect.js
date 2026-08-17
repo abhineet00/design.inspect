@@ -15,7 +15,11 @@
     edits: /* @__PURE__ */ new Map(),
     panelPos: { x: null, y: 16 },
     // panel screen position (null x = right-docked)
-    collapsed: false
+    collapsed: false,
+    editing: false,
+    // inline text editing in progress
+    dragging: false
+    // drag-to-reorder in progress
   };
   var subs = /* @__PURE__ */ new Set();
   var store = {
@@ -125,14 +129,16 @@
         "data-inspect-ui": "",
         style: {
           position: "fixed",
-          font: "600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace",
-          color: "#fff",
-          background: "#4c8dff",
-          padding: "2px 6px",
-          borderRadius: "4px",
+          font: "500 12px/1.4 'Quicksand', -apple-system, 'Segoe UI', Roboto, sans-serif",
+          color: "rgba(255,255,255,0.6)",
+          background: "rgba(0,0,0,0.82)",
+          border: "1px solid rgba(255,255,255,0.12)",
+          padding: "4px 9px",
+          borderRadius: "8px",
           whiteSpace: "nowrap",
           pointerEvents: "none",
-          boxShadow: "0 1px 4px rgba(0,0,0,.3)"
+          boxShadow: "0 6px 20px rgba(0,0,0,.45)",
+          backdropFilter: "blur(6px)"
         }
       });
       this.el.append(this.margin, this.padding, this.content, this.selected, this.badge);
@@ -175,7 +181,8 @@
       });
       this._place(this.content, r);
       this._place(this.padding, r);
-      this.badge.textContent = `${round(r.width)} \xD7 ${round(r.height)}`;
+      const label = elementLabel(el);
+      this.badge.innerHTML = `<span style="color:#58aeff">${escapeHtml(label)}</span><span style="opacity:.5">&nbsp;&nbsp;${round(r.width)} \xD7 ${round(r.height)}</span>`;
       this.badge.style.display = "block";
       const bTop = r.top > 24 ? r.top - 22 : r.bottom + 6;
       this.badge.style.left = Math.max(4, r.left) + "px";
@@ -200,6 +207,9 @@
   function num(cs, prop) {
     const g = (s) => parseFloat(cs.getPropertyValue(`${prop}-${s}`)) || 0;
     return { top: g("top"), right: g("right"), bottom: g("bottom"), left: g("left") };
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
   // src/core/inspector.js
@@ -236,6 +246,7 @@
       return el;
     }
     _onMove(e) {
+      if (store.get().editing || store.get().dragging) return;
       const el = this._target(e);
       if (!el) return this.overlay.hideHover();
       if (el === store.get().hoverEl) return;
@@ -244,6 +255,7 @@
     }
     _onClick(e) {
       if (isOwnUI(e.target)) return;
+      if (store.get().editing || store.get().dragging) return;
       const el = this._target(e);
       if (!el) return;
       e.preventDefault();
@@ -974,7 +986,7 @@ ${body}
       if (!el) return body.append(h("div", { class: "empty", text: "No element selected." }));
       const clone = el.cloneNode(false);
       clone.removeAttribute("data-inspect-id");
-      body.append(h("pre", { class: "code", html: escapeHtml(clone.outerHTML.replace(/></, ">\n  \u2026\n<")) }));
+      body.append(h("pre", { class: "code", html: escapeHtml2(clone.outerHTML.replace(/></, ">\n  \u2026\n<")) }));
     }
     _copy() {
       var _a;
@@ -1121,11 +1133,11 @@ font-weight: ${t.weight};`, "Type style copied")
   function parseLenSafe(v) {
     return v && v !== "auto" ? v : "0px";
   }
-  function escapeHtml(s) {
+  function escapeHtml2(s) {
     return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
   function highlight(css2) {
-    return escapeHtml(css2).replace(/^([^{\n]+)\{/gm, '<span class="sel">$1</span>{').replace(/^(\s+)([\w-]+)(:)/gm, '$1<span class="prop">$2</span>$3').replace(/: ([^;]+);/g, ': <span class="val">$1</span>;');
+    return escapeHtml2(css2).replace(/^([^{\n]+)\{/gm, '<span class="sel">$1</span>{').replace(/^(\s+)([\w-]+)(:)/gm, '$1<span class="prop">$2</span>$3').replace(/: ([^;]+);/g, ': <span class="val">$1</span>;');
   }
 
   // src/ui/toolbar.js
@@ -1197,6 +1209,232 @@ font-weight: ${t.weight};`, "Type style copied")
     return h("div", { class: "dock-sep" });
   }
 
+  // src/ui/tooltip.js
+  var Tooltip = class {
+    constructor(root) {
+      this.root = root;
+      this.el = h("div", { class: "tooltip", "data-inspect-ui": "" });
+      root.appendChild(this.el);
+      root.addEventListener("pointerover", (e) => this._over(e), true);
+      root.addEventListener("pointerout", (e) => this._out(e), true);
+      root.addEventListener("pointerdown", () => this.hide(), true);
+    }
+    _over(e) {
+      const t = e.target.closest && e.target.closest("[title],[data-tip]");
+      if (!t || !this.root.contains(t)) return;
+      if (t.hasAttribute("title")) {
+        const v = t.getAttribute("title");
+        if (v) t.setAttribute("data-tip", v);
+        t.removeAttribute("title");
+      }
+      const text = t.getAttribute("data-tip");
+      if (text) this.show(text, t);
+    }
+    _out(e) {
+      const t = e.target.closest && e.target.closest("[data-tip]");
+      if (t && !t.contains(e.relatedTarget)) this.hide();
+    }
+    show(text, target) {
+      this.el.textContent = text;
+      this.el.classList.add("show");
+      const r = target.getBoundingClientRect();
+      const tr = this.el.getBoundingClientRect();
+      let top = r.top - tr.height - 8;
+      let left = r.left + r.width / 2 - tr.width / 2;
+      if (top < 6) top = r.bottom + 8;
+      left = Math.max(6, Math.min(left, window.innerWidth - tr.width - 6));
+      this.el.style.left = Math.round(left) + "px";
+      this.el.style.top = Math.round(top) + "px";
+    }
+    hide() {
+      this.el.classList.remove("show");
+    }
+  };
+
+  // src/core/textEdit.js
+  var TextEditor = class {
+    constructor(onChange) {
+      this.onChange = onChange;
+      this._onDblClick = this._onDblClick.bind(this);
+      this._onKey = this._onKey.bind(this);
+    }
+    start() {
+      document.addEventListener("dblclick", this._onDblClick, true);
+    }
+    stop() {
+      document.removeEventListener("dblclick", this._onDblClick, true);
+      this._finish();
+    }
+    _editable(el) {
+      if (!el || el.nodeType !== 1 || isOwnUI(el)) return null;
+      let node = el;
+      while (node && node !== document.body) {
+        const holdsText = [...node.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim());
+        const noBlockKids = ![...node.children].some((c) => {
+          const d = getComputedStyle(c).display;
+          return d === "block" || d === "flex" || d === "grid";
+        });
+        if (holdsText && noBlockKids) return node;
+        node = node.parentElement;
+      }
+      return el.matches("h1,h2,h3,h4,h5,h6,p,span,a,button,li,td,th,label,strong,em,small,div") ? el : null;
+    }
+    _onDblClick(e) {
+      var _a, _b;
+      if (isOwnUI(e.target)) return;
+      const el = this._editable(e.target);
+      if (!el) return;
+      e.preventDefault();
+      e.stopPropagation();
+      store.set({ editing: true, selectedEl: el });
+      this.el = el;
+      this._prevWS = el.style.whiteSpace;
+      el.setAttribute("contenteditable", "true");
+      el.setAttribute("data-inspect-editing", "");
+      el.focus();
+      const range = (_a = document.caretRangeFromPoint) == null ? void 0 : _a.call(document, e.clientX, e.clientY);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      if (range) sel.addRange(range);
+      else (_b = document.execCommand) == null ? void 0 : _b.call(document, "selectAll", false, null);
+      el.addEventListener("blur", () => this._finish(), { once: true });
+      document.addEventListener("keydown", this._onKey, true);
+    }
+    _onKey(e) {
+      if (!this.el) return;
+      if (e.key === "Escape" || e.key === "Enter" && !e.shiftKey && this.el.tagName !== "DIV") {
+        e.preventDefault();
+        this.el.blur();
+      }
+    }
+    _finish() {
+      var _a;
+      document.removeEventListener("keydown", this._onKey, true);
+      if (this.el) {
+        this.el.removeAttribute("contenteditable");
+        this.el.removeAttribute("data-inspect-editing");
+        this.el = null;
+      }
+      if (store.get().editing) store.set({ editing: false });
+      (_a = this.onChange) == null ? void 0 : _a.call(this);
+    }
+  };
+
+  // src/core/dragMove.js
+  var THRESHOLD = 5;
+  var DragMove = class {
+    constructor(onReorder) {
+      this.onReorder = onReorder;
+      this.indicator = h("div", {
+        "data-inspect-ui": "",
+        style: {
+          position: "fixed",
+          background: "#58aeff",
+          borderRadius: "2px",
+          pointerEvents: "none",
+          zIndex: "2147483645",
+          display: "none",
+          boxShadow: "0 0 6px rgba(88,174,255,.8)"
+        }
+      });
+      document.documentElement.appendChild(this.indicator);
+      this._down = this._down.bind(this);
+      this._move = this._move.bind(this);
+      this._up = this._up.bind(this);
+    }
+    start() {
+      document.addEventListener("mousedown", this._down, true);
+    }
+    stop() {
+      document.removeEventListener("mousedown", this._down, true);
+      this.indicator.remove();
+    }
+    _down(e) {
+      if (e.button !== 0 || isOwnUI(e.target)) return;
+      const sel = store.get().selectedEl;
+      if (!sel) return;
+      const el = document.elementFromPoint(e.clientX, e.clientY);
+      if (!el || el !== sel && !sel.contains(el)) return;
+      this.sx = e.clientX;
+      this.sy = e.clientY;
+      this.armed = true;
+      this.dragging = false;
+      document.addEventListener("mousemove", this._move, true);
+      document.addEventListener("mouseup", this._up, true);
+    }
+    _move(e) {
+      if (!this.armed) return;
+      if (!this.dragging) {
+        if (Math.hypot(e.clientX - this.sx, e.clientY - this.sy) < THRESHOLD) return;
+        this.dragging = true;
+        store.set({ dragging: true });
+        document.documentElement.style.cursor = "grabbing";
+      }
+      this._updateTarget(e);
+    }
+    _updateTarget(e) {
+      const el = store.get().selectedEl;
+      const parent = el == null ? void 0 : el.parentElement;
+      if (!parent) return;
+      const siblings = [...parent.children].filter((c) => !isOwnUI(c));
+      const under = document.elementFromPoint(e.clientX, e.clientY);
+      const sib = siblings.find((s) => s === under || s.contains(under));
+      if (!sib || sib === el) {
+        this.ref = void 0;
+        return this.indicator.style.display = "none";
+      }
+      const row = /row/.test(getComputedStyle(parent).flexDirection) || getComputedStyle(parent).display.includes("inline");
+      const r = sib.getBoundingClientRect();
+      const after = row ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
+      this.ref = after ? sib.nextElementSibling : sib;
+      if (this.ref === el) this.ref = after ? el.nextElementSibling : el;
+      if (row) {
+        const x = after ? r.right : r.left;
+        Object.assign(this.indicator.style, {
+          display: "block",
+          left: x - 1 + "px",
+          top: r.top + "px",
+          width: "3px",
+          height: r.height + "px"
+        });
+      } else {
+        const y = after ? r.bottom : r.top;
+        Object.assign(this.indicator.style, {
+          display: "block",
+          left: r.left + "px",
+          top: y - 1 + "px",
+          width: r.width + "px",
+          height: "3px"
+        });
+      }
+    }
+    _up() {
+      var _a;
+      document.removeEventListener("mousemove", this._move, true);
+      document.removeEventListener("mouseup", this._up, true);
+      this.indicator.style.display = "none";
+      document.documentElement.style.cursor = "";
+      const wasDragging = this.dragging;
+      this.armed = false;
+      this.dragging = false;
+      if (wasDragging) {
+        const el = store.get().selectedEl;
+        if (el && this.ref !== void 0 && this.ref !== el) {
+          el.parentElement.insertBefore(el, this.ref || null);
+        }
+        store.set({ dragging: false });
+        this.ref = void 0;
+        const swallow = (ev) => {
+          ev.stopPropagation();
+          ev.preventDefault();
+          document.removeEventListener("click", swallow, true);
+        };
+        document.addEventListener("click", swallow, true);
+        (_a = this.onReorder) == null ? void 0 : _a.call(this, el);
+      }
+    }
+  };
+
   // src/ui/font.js
   var fontFace = `@font-face {
   font-family: 'Quicksand';
@@ -1226,6 +1464,7 @@ ${fontFace}
   --line: #505050;
   --divider: rgba(255, 255, 255, 0.07);
   --border-soft: #afafaf;
+  --tool-border: rgba(255, 255, 255, 0.12);
   --tool-bg: rgba(0, 0, 0, 0.6);
   --tool-active: #353539;
   --text: #ffffff;
@@ -1443,13 +1682,13 @@ ${fontFace}
 .dock-circle {
   width: 44px; height: 44px; border-radius: 999px; display: grid; place-items: center;
   background: var(--tool-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border: 1px solid var(--border-soft); color: var(--text); cursor: pointer;
+  border: 1px solid var(--tool-border); color: var(--text); cursor: pointer;
 }
 .dock-circle:hover { background: var(--tool-active); }
 .dock-group {
   display: flex; flex-direction: column; align-items: center;
   background: var(--tool-bg); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
-  border: 1px solid var(--border-soft); border-radius: 22px; padding: 4px; gap: 0;
+  border: 1px solid var(--tool-border); border-radius: 22px; padding: 4px; gap: 0;
 }
 .dock-btn {
   width: 44px; height: 44px; display: grid; place-items: center; border-radius: 18px;
@@ -1459,6 +1698,18 @@ ${fontFace}
 .dock-btn.active { background: var(--tool-active); }
 .dock-btn svg, .dock-circle svg { width: 20px; height: 20px; }
 .dock-sep { width: 24px; height: 1px; background: var(--line); margin: 1px 0; }
+
+/* ---------- Custom tooltip ---------- */
+.tooltip {
+  position: fixed; z-index: 2147483647; pointer-events: none;
+  background: #1b1b1b; color: var(--text);
+  border: 1px solid var(--tool-border);
+  font-family: var(--font); font-size: 12px; font-weight: 500;
+  padding: 5px 9px; border-radius: 8px; white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(0,0,0,.45);
+  opacity: 0; transform: translateY(2px); transition: opacity .1s, transform .1s;
+}
+.tooltip.show { opacity: 1; transform: translateY(0); }
 
 /* toast */
 .toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
@@ -1481,8 +1732,13 @@ ${fontFace}
       wrap.className = "wrap";
       shadow.append(style, wrap);
       document.documentElement.appendChild(this.host);
+      this.fontStyle = document.createElement("style");
+      this.fontStyle.setAttribute("data-inspect-ui", "");
+      this.fontStyle.textContent = fontFace;
+      document.head.appendChild(this.fontStyle);
       this.overlay = new Overlay(document.documentElement);
       this.panel = new Panel(wrap);
+      this.tooltip = new Tooltip(wrap);
       this.toolbar = new Toolbar(wrap, {
         undo: () => {
           undo();
@@ -1497,6 +1753,15 @@ ${fontFace}
         toggleResponsive: () => this.toggleResponsive()
       });
       this.inspector = new Inspector(this.overlay, (el) => this.select(el));
+      this.textEditor = new TextEditor(() => this.panel.render());
+      this.dragMove = new DragMove((el) => {
+        if (el) {
+          this.overlay.select(el);
+          this.panel.render();
+        }
+      });
+      this.textEditor.start();
+      this.dragMove.start();
       this._prevView = store.get().view;
       this._prevCollapsed = store.get().collapsed;
       this.unsub = store.subscribe((s) => this.onState(s));
@@ -1565,13 +1830,16 @@ ${fontFace}
       }
     }
     destroy() {
-      var _a;
+      var _a, _b;
       (_a = this.unsub) == null ? void 0 : _a.call(this);
       window.removeEventListener("scroll", this._track, true);
       window.removeEventListener("resize", this._track, true);
+      this.textEditor.stop();
+      this.dragMove.stop();
       this.inspector.stop();
       this.overlay.destroy();
       this.host.remove();
+      (_b = this.fontStyle) == null ? void 0 : _b.remove();
       this.toggleResponsiveOff();
       const live = document.getElementById("inspect-css-live-styles");
       if (live) live.remove();
@@ -1588,7 +1856,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.4.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.5.0" };
   }
   boot();
 })();

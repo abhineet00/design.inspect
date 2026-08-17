@@ -1,7 +1,7 @@
 // A full-viewport, click-through overlay that draws highlight boxes,
 // margin/padding shading and a size badge over the hovered/selected element.
 
-import { h, round } from './util.js';
+import { h, round, elementLabel } from './util.js';
 
 export class Overlay {
   constructor(root) {
@@ -24,14 +24,16 @@ export class Overlay {
       'data-inspect-ui': '',
       style: {
         position: 'fixed',
-        font: '600 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace',
-        color: '#fff',
-        background: '#4c8dff',
-        padding: '2px 6px',
-        borderRadius: '4px',
+        font: "500 12px/1.4 'Quicksand', -apple-system, 'Segoe UI', Roboto, sans-serif",
+        color: 'rgba(255,255,255,0.6)',
+        background: 'rgba(0,0,0,0.82)',
+        border: '1px solid rgba(255,255,255,0.12)',
+        padding: '4px 9px',
+        borderRadius: '8px',
         whiteSpace: 'nowrap',
         pointerEvents: 'none',
-        boxShadow: '0 1px 4px rgba(0,0,0,.3)',
+        boxShadow: '0 6px 20px rgba(0,0,0,.45)',
+        backdropFilter: 'blur(6px)',
       },
     });
     this.el.append(this.margin, this.padding, this.content, this.selected, this.badge);
@@ -82,8 +84,11 @@ export class Overlay {
     // padding shade sits just inside the border box
     this._place(this.padding, r);
 
-    // size badge above the element (or below if no room)
-    this.badge.textContent = `${round(r.width)} × ${round(r.height)}`;
+    // name + size badge above the element (or below if no room)
+    const label = elementLabel(el);
+    this.badge.innerHTML =
+      `<span style="color:#58aeff">${escapeHtml(label)}</span>` +
+      `<span style="opacity:.5">&nbsp;&nbsp;${round(r.width)} × ${round(r.height)}</span>`;
     this.badge.style.display = 'block';
     const bTop = r.top > 24 ? r.top - 22 : r.bottom + 6;
     this.badge.style.left = Math.max(4, r.left) + 'px';
@@ -111,4 +116,8 @@ export class Overlay {
 function num(cs, prop) {
   const g = (s) => parseFloat(cs.getPropertyValue(`${prop}-${s}`)) || 0;
   return { top: g('top'), right: g('right'), bottom: g('bottom'), left: g('left') };
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }

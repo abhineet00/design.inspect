@@ -41,6 +41,7 @@ export class Inspector {
   }
 
   _onMove(e) {
+    if (store.get().editing || store.get().dragging) return;
     const el = this._target(e);
     if (!el) return this.overlay.hideHover();
     if (el === store.get().hoverEl) return;
@@ -50,6 +51,7 @@ export class Inspector {
 
   _onClick(e) {
     if (isOwnUI(e.target)) return; // let our UI work normally
+    if (store.get().editing || store.get().dragging) return;
     const el = this._target(e);
     if (!el) return;
     e.preventDefault();

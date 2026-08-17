@@ -7,7 +7,11 @@ import { Overlay } from './core/overlay.js';
 import { Inspector } from './core/inspector.js';
 import { Panel } from './ui/panel.js';
 import { Toolbar } from './ui/toolbar.js';
+import { Tooltip } from './ui/tooltip.js';
+import { TextEditor } from './core/textEdit.js';
+import { DragMove } from './core/dragMove.js';
 import { css } from './ui/theme.js';
+import { fontFace } from './ui/font.js';
 import { undo, redo } from './core/liveStyles.js';
 
 class App {
@@ -23,8 +27,16 @@ class App {
     shadow.append(style, wrap);
     document.documentElement.appendChild(this.host);
 
+    // Register Quicksand at the document level too, so light-DOM UI (the hover
+    // badge / drop indicator) renders in the design font.
+    this.fontStyle = document.createElement('style');
+    this.fontStyle.setAttribute('data-inspect-ui', '');
+    this.fontStyle.textContent = fontFace;
+    document.head.appendChild(this.fontStyle);
+
     this.overlay = new Overlay(document.documentElement);
     this.panel = new Panel(wrap);
+    this.tooltip = new Tooltip(wrap);
     this.toolbar = new Toolbar(wrap, {
       undo: () => { undo(); this.panel.render(); },
       redo: () => { redo(); this.panel.render(); },
@@ -33,6 +45,10 @@ class App {
       toggleResponsive: () => this.toggleResponsive(),
     });
     this.inspector = new Inspector(this.overlay, (el) => this.select(el));
+    this.textEditor = new TextEditor(() => this.panel.render());
+    this.dragMove = new DragMove((el) => { if (el) { this.overlay.select(el); this.panel.render(); } });
+    this.textEditor.start();
+    this.dragMove.start();
 
     this._prevView = store.get().view;
     this._prevCollapsed = store.get().collapsed;
@@ -107,9 +123,12 @@ class App {
     this.unsub?.();
     window.removeEventListener('scroll', this._track, true);
     window.removeEventListener('resize', this._track, true);
+    this.textEditor.stop();
+    this.dragMove.stop();
     this.inspector.stop();
     this.overlay.destroy();
     this.host.remove();
+    this.fontStyle?.remove();
     this.toggleResponsiveOff();
     const live = document.getElementById('inspect-css-live-styles');
     if (live) live.remove();
@@ -124,7 +143,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.4.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.5.0' };
 }
 
 boot();
