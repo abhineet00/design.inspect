@@ -18,8 +18,10 @@
     collapsed: false,
     editing: false,
     // inline text editing in progress
-    dragging: false
+    dragging: false,
     // drag-to-reorder in progress
+    changeLog: []
+    // chronological record of every change made
   };
   var subs = /* @__PURE__ */ new Set();
   var store = {
@@ -318,6 +320,63 @@
     return parts.join(" > ");
   }
 
+  // src/core/changeLog.js
+  function logChange(entry) {
+    entry.time = Date.now();
+    const log = store.get().changeLog;
+    const last = log[log.length - 1];
+    const sameCss = entry.type === "css" && last && last.type === "css" && last.id === entry.id && last.prop === entry.prop && last.pseudo === entry.pseudo;
+    const sameText = entry.type === "text" && last && last.type === "text" && last.id === entry.id;
+    if (sameCss || sameText) {
+      last.to = entry.to;
+      last.time = entry.time;
+    } else {
+      log.push(entry);
+    }
+    store.set({ changeLog: log });
+  }
+  function getLog() {
+    return store.get().changeLog;
+  }
+  function clearLog() {
+    const log = store.get().changeLog;
+    log.length = 0;
+    store.set({ changeLog: log });
+  }
+  function describe(e) {
+    if (e.type === "text") return `text \u2192 "${trim(e.to, 40)}"`;
+    return `${e.prop}: ${e.to}`;
+  }
+  function generateAiPrompt() {
+    const log = getLog();
+    if (!log.length) return "";
+    const groups = /* @__PURE__ */ new Map();
+    for (const e of log) {
+      const key = e.selector || e.label;
+      if (!groups.has(key)) groups.set(key, { label: e.label, selector: e.selector, css: /* @__PURE__ */ new Map(), text: null });
+      const g = groups.get(key);
+      if (e.type === "css") g.css.set(e.pseudo && e.pseudo !== "none" ? `${e.prop} (:${e.pseudo})` : e.prop, e.to);
+      else g.text = e.to;
+    }
+    let out = "Apply the following design changes to my web page, then return the updated HTML/CSS.\n\n";
+    let i = 1;
+    for (const g of groups.values()) {
+      out += `${i}. Element \`${g.selector || g.label}\`:
+`;
+      for (const [prop, val2] of g.css) out += `   - set ${prop} to ${val2}
+`;
+      if (g.text != null) out += `   - change its text to: "${g.text}"
+`;
+      i++;
+    }
+    out += "\nKeep everything else unchanged.";
+    return out.trim();
+  }
+  function trim(s, n) {
+    s = String(s);
+    return s.length > n ? s.slice(0, n) + "\u2026" : s;
+  }
+
   // src/core/liveStyles.js
   var STYLE_ID = "inspect-css-live-styles";
   function styleEl() {
@@ -366,10 +425,12 @@
     restore(future.pop());
   }
   function setProp(el, prop, value) {
+    var _a, _b;
     pushHistory();
     const id = ensureInspectId(el);
     const { edits, pseudo } = store.get();
     const key = pseudo === "none" ? id : `${id}::${pseudo}`;
+    const from = (_b = (_a = edits.get(key)) == null ? void 0 : _a.props.get(prop)) != null ? _b : getComputedStyle(el).getPropertyValue(prop).trim();
     let entry = edits.get(key);
     if (!entry) {
       entry = {
@@ -385,6 +446,9 @@
     if (entry.props.size === 0) edits.delete(key);
     render();
     store.set({ edits });
+    if (value !== "" && value != null) {
+      logChange({ type: "css", id, prop, from, to: value, pseudo, label: elementLabel(el), selector: entry.selector });
+    }
   }
   function getEditedProps(el, pseudo = "none") {
     const id = el.getAttribute("data-inspect-id");
@@ -683,20 +747,90 @@ ${body}
       unitEl
     ]);
   }
+  var CHECK_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>';
+  var openMenuState = null;
+  function closeMenu() {
+    if (!openMenuState) return;
+    const { menu, anchor, onDoc, onKey } = openMenuState;
+    menu.remove();
+    anchor.classList.remove("open");
+    document.removeEventListener("mousedown", onDoc, true);
+    document.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("scroll", onDoc, true);
+    openMenuState = null;
+  }
+  function openMenu(anchor, opts, current, onPick) {
+    if (openMenuState && openMenuState.anchor === anchor) return closeMenu();
+    closeMenu();
+    const root = anchor.getRootNode();
+    const wrap = root.querySelector && root.querySelector(".wrap") || document.body;
+    const menu = h(
+      "div",
+      { class: "dropdown-menu", "data-inspect-ui": "" },
+      opts.map(([v, l]) => {
+        const isActive = String(v) === String(current);
+        const item = h("div", { class: "dropdown-item" + (isActive ? " active" : "") }, [
+          h("span", { text: l }),
+          isActive ? h("span", { class: "dropdown-check", html: CHECK_SVG }) : null
+        ]);
+        item.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onPick(v);
+          closeMenu();
+        });
+        return item;
+      })
+    );
+    wrap.appendChild(menu);
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.round(r.left) + "px";
+    menu.style.top = Math.round(r.bottom + 4) + "px";
+    menu.style.minWidth = Math.round(r.width) + "px";
+    const mr = menu.getBoundingClientRect();
+    if (mr.bottom > window.innerHeight - 8) menu.style.top = Math.round(r.top - mr.height - 4) + "px";
+    const active = menu.querySelector(".dropdown-item.active");
+    if (active) active.scrollIntoView({ block: "nearest" });
+    anchor.classList.add("open");
+    const onDoc = (e) => {
+      if (!e.composedPath().includes(menu) && !e.composedPath().includes(anchor)) closeMenu();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    setTimeout(() => {
+      document.addEventListener("mousedown", onDoc, true);
+      document.addEventListener("keydown", onKey, true);
+      window.addEventListener("scroll", onDoc, true);
+    }, 0);
+    openMenuState = { menu, anchor, onDoc, onKey };
+  }
   function selectField({ value, options, onChange, iconName, key, sm = true }) {
-    const sel = h("select", {});
-    for (const opt of options) {
-      const [v, l] = Array.isArray(opt) ? opt : [opt, opt];
-      const o = h("option", { value: v, text: l });
-      if (String(v) === String(value)) o.selected = true;
-      sel.appendChild(o);
-    }
-    sel.addEventListener("change", () => onChange(sel.value));
-    return h("div", { class: "field select-like" + (sm ? " sm" : "") }, [
+    const opts = options.map((o) => Array.isArray(o) ? o : [o, o]);
+    const current = opts.find(([v]) => String(v) === String(value));
+    const valueEl = h("span", { class: "sel-value", text: current ? current[1] : value != null ? value : "" });
+    const field2 = h("div", { class: "field select-like" + (sm ? " sm" : ""), tabindex: "0" }, [
       iconName ? ico(iconName) : key ? h("span", { class: "fk", text: key }) : null,
-      sel,
+      valueEl,
       chevMini()
     ]);
+    const open = () => openMenu(field2, opts, value, (v) => {
+      value = v;
+      const nl = opts.find(([ov]) => String(ov) === String(v));
+      valueEl.textContent = nl ? nl[1] : v;
+      onChange(v);
+    });
+    field2.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      open();
+    });
+    field2.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    });
+    return field2;
   }
   function iconButtons(buttons, { active = -1, grow = false, seg = false, onPick } = {}) {
     const row = h("div", { class: "iconrow" + (grow ? " grow" : "") + (seg ? " seg" : "") });
@@ -793,10 +927,10 @@ ${body}
       this.el.append(this._head());
       const body = h("div", { class: "panel-body" });
       if (st.view === "assets") this._assets(body);
+      else if (st.view === "changes") this._changes(body);
       else if (!this.selected) {
         body.append(h("div", { class: "empty", text: "Pick an element on the page to inspect and edit its styles." }));
-      } else if (st.view === "code") this._code(body);
-      else if (st.view === "html") this._html(body);
+      } else if (st.view === "html") this._html(body);
       else this._design(body);
       this.el.append(body);
     }
@@ -808,11 +942,8 @@ ${body}
           h("div", { class: "head-top" }, [
             h("div", { class: "head-title", text: "Assets" }),
             h("div", { class: "head-actions" }, [
-              hbtn("minimize-screen", "Collapse panel", () => store.set({ collapsed: true })),
-              hbtn("x", "Close", () => {
-                var _a;
-                return (_a = window.InspectCSS) == null ? void 0 : _a.destroy();
-              })
+              hbtn("minimize-screen", "Close panel", () => store.set({ collapsed: true })),
+              hbtn("x", "Close panel", () => store.set({ collapsed: true }))
             ])
           ]),
           h("div", { class: "crumb", style: { color: "var(--muted)" }, text: "Everything this page uses" })
@@ -829,11 +960,8 @@ ${body}
               clearAll();
               this.render();
             }, "danger"),
-            hbtn("minimize-screen", "Collapse panel", () => store.set({ collapsed: true })),
-            hbtn("x", "Close", () => {
-              var _a;
-              return (_a = window.InspectCSS) == null ? void 0 : _a.destroy();
-            })
+            hbtn("minimize-screen", "Close panel", () => store.set({ collapsed: true })),
+            hbtn("x", "Close panel (Exit InspectCSS from the left dock)", () => store.set({ collapsed: true }))
           ])
         ]),
         el ? h("div", { class: "crumb" }, crumb.map((c) => h("span", { text: c }))) : null,
@@ -848,6 +976,7 @@ ${body}
       const el = this.selected;
       const m = readModel(el);
       const on = (prop) => (v) => setProp(el, prop, v);
+      const onPx = (prop) => (v) => setProp(el, prop, /^-?[\d.]+$/.test(String(v).trim()) ? v + "px" : v);
       const t = m.transform;
       const setT = (patch) => {
         Object.assign(t, patch);
@@ -884,8 +1013,8 @@ ${body}
           onChange: on("display")
         })),
         h("div", { class: "row" }, [
-          labeled("Row Gap", field({ iconName: "paragraph-spacing", value: m.layout.rowGap, showUnit: false, sm: true, onChange: on("row-gap") })),
-          labeled("Column Gap", field({ iconName: "letter-spacing", value: m.layout.columnGap, showUnit: false, sm: true, onChange: on("column-gap") }))
+          labeled("Row Gap", field({ iconName: "paragraph-spacing", value: m.layout.rowGap, showUnit: false, sm: true, onChange: onPx("row-gap") })),
+          labeled("Column Gap", field({ iconName: "letter-spacing", value: m.layout.columnGap, showUnit: false, sm: true, onChange: onPx("column-gap") }))
         ]),
         h("div", { class: "row" }, [
           labeled("Horizontal Align", selectField({ value: m.layout.justify, options: [["flex-start", "Start"], ["center", "Center"], ["flex-end", "End"], ["space-between", "Between"]], onChange: on("justify-content") })),
@@ -926,11 +1055,11 @@ ${body}
         h("div", { class: "row" }, [
           labeled("Opacity", field({ iconName: "transparency", value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: "%", onChange: (v) => on("opacity")((parseFloat(v) || 100) / 100) })),
           labeled("Corner", h("div", { class: "corner-mix" }, [
-            field({ iconName: "full-screen", value: mixed ? "mix" : m.radius.all, showUnit: false, onChange: on("border-radius") }),
-            iconButtons([{ icon: "full-screen", title: "Link corners" }], { onPick: () => on("border-radius")(m.radius.tl) })
+            field({ iconName: "full-screen", value: mixed ? "mix" : m.radius.all, showUnit: false, onChange: onPx("border-radius") }),
+            iconButtons([{ icon: "full-screen", title: "Link corners" }], { onPick: () => onPx("border-radius")(m.radius.tl) })
           ]))
         ]),
-        h("div", { class: "corner-grid" }, corners.map((c) => field({ iconName: "full-screen", value: c.v, showUnit: false, onChange: on(c.prop) }))),
+        h("div", { class: "corner-grid" }, corners.map((c) => field({ iconName: "full-screen", value: c.v, showUnit: false, onChange: onPx(c.prop) }))),
         addRow("Fill", () => {
           this._fillOpen = !this._fillOpen;
           this.render();
@@ -954,7 +1083,7 @@ ${body}
         ]),
         h("div", { class: "row" }, [
           labeled("Line Height", field({ iconName: "paragraph-spacing", value: normalizeLine(m.typography.lineHeight), showUnit: false, sm: true, onChange: on("line-height") })),
-          labeled("Letter Spacing", field({ iconName: "letter-spacing", value: m.typography.letterSpacing, showUnit: false, sm: true, onChange: on("letter-spacing") }))
+          labeled("Letter Spacing", field({ iconName: "letter-spacing", value: m.typography.letterSpacing, showUnit: false, sm: true, onChange: onPx("letter-spacing") }))
         ]),
         h("div", { class: "row" }, [
           labeled("Paragraph Spacing", field({ iconName: "expand-paragraph", value: parseLenSafe(m.typography.marginBottom), sm: true, onChange: on("margin-bottom") })),
@@ -967,19 +1096,49 @@ ${body}
         ])
       ]));
     }
-    // ---------------- Code view ----------------
-    _code(body) {
+    // ---------------- Changes view (change log + generated CSS + AI prompt) ----------------
+    _changes(body) {
+      const log = getLog();
       const cssText = generateCss();
-      body.append(
-        h("div", { class: "view-actions" }, [
-          h("button", { class: "btn primary", text: "Copy CSS", onclick: () => this._copy() }),
-          h("button", { class: "btn", text: "Reset", onclick: () => {
-            clearAll();
-            this.render();
-          } })
-        ]),
-        cssText ? h("pre", { class: "code", html: highlight(cssText) }) : h("div", { class: "empty", text: "No edits yet. Change a property in the Design view and the generated CSS appears here." })
-      );
+      const prompt = generateAiPrompt();
+      body.append(h("div", { class: "view-actions" }, [
+        h("button", { class: "btn primary", text: "Copy CSS", onclick: () => this._copy() }),
+        h("button", { class: "btn", text: "Copy AI prompt", onclick: () => {
+          var _a;
+          if (prompt) (_a = navigator.clipboard) == null ? void 0 : _a.writeText(prompt).then(() => this._toast("AI prompt copied"));
+        } }),
+        h("button", { class: "btn", text: "Clear", onclick: () => {
+          clearLog();
+          this.render();
+        } })
+      ]));
+      if (!log.length) {
+        body.append(h("div", { class: "empty", text: "No changes yet. Edit a property, colour or text and every change is logged here." }));
+        return;
+      }
+      body.append(assetSection(
+        "Change log",
+        log.length,
+        h("div", { class: "log-list" }, [...log].reverse().map(
+          (e) => h("div", { class: "log-item" }, [
+            h("span", { class: "log-el", text: e.label || e.selector }),
+            h("span", { class: "log-desc", text: describe(e) })
+          ])
+        ))
+      ));
+      body.append(assetSection(
+        "AI prompt",
+        0,
+        h("div", {}, [
+          h("div", { class: "ai-hint", text: "Paste this into any AI to apply these changes to your codebase." }),
+          h("pre", { class: "code ai-prompt", text: prompt })
+        ])
+      ));
+      body.append(assetSection(
+        "Generated CSS",
+        0,
+        cssText ? h("pre", { class: "code", html: highlight(cssText) }) : h("div", { class: "empty", text: "No CSS edits." })
+      ));
     }
     _html(body) {
       const el = this.selected;
@@ -1098,7 +1257,7 @@ font-weight: ${t.weight};`, "Type style copied")
   }
   function assetSection(title, count, content) {
     const head = h("div", { class: "sec-head" }, [
-      h("span", {}, [title, h("span", { class: "asset-count", text: String(count) })]),
+      h("span", {}, [title, count ? h("span", { class: "asset-count", text: String(count) }) : null]),
       h("span", { class: "chev", html: icon("chevron-down") })
     ]);
     const sec = h("div", { class: "section" }, [head, h("div", { class: "sec-content" }, [content])]);
@@ -1175,7 +1334,7 @@ font-weight: ${t.weight};`, "Type style copied")
           const v = store.get().view;
           store.set({ view: v === "assets" ? "design" : "assets", collapsed: false });
         }),
-        this.codeBtn = dockBtn("file-diff", "Generated CSS", () => store.set({ view: "code", collapsed: false })),
+        this.codeBtn = dockBtn("file-diff", "Changes & AI prompt", () => store.set({ view: "changes", collapsed: false })),
         this.htmlBtn = dockBtn("html-file-01", "HTML", () => store.set({ view: "html", collapsed: false })),
         sep(),
         dockBtn("laptop-phone-sync", "Toggle responsive preview", () => {
@@ -1195,7 +1354,7 @@ font-weight: ${t.weight};`, "Type style copied")
       const s = store.get();
       (_a = this.pauseBtn) == null ? void 0 : _a.classList.toggle("active", s.active);
       (_b = this.assetsBtn) == null ? void 0 : _b.classList.toggle("active", s.view === "assets");
-      (_c = this.codeBtn) == null ? void 0 : _c.classList.toggle("active", s.view === "code");
+      (_c = this.codeBtn) == null ? void 0 : _c.classList.toggle("active", s.view === "changes");
       (_d = this.htmlBtn) == null ? void 0 : _d.classList.toggle("active", s.view === "html");
     }
   };
@@ -1288,7 +1447,8 @@ font-weight: ${t.weight};`, "Type style copied")
       e.stopPropagation();
       store.set({ editing: true, selectedEl: el });
       this.el = el;
-      this._prevWS = el.style.whiteSpace;
+      this._origText = el.textContent;
+      ensureInspectId(el);
       el.setAttribute("contenteditable", "true");
       el.setAttribute("data-inspect-editing", "");
       el.focus();
@@ -1311,8 +1471,20 @@ font-weight: ${t.weight};`, "Type style copied")
       var _a;
       document.removeEventListener("keydown", this._onKey, true);
       if (this.el) {
-        this.el.removeAttribute("contenteditable");
-        this.el.removeAttribute("data-inspect-editing");
+        const el = this.el;
+        el.removeAttribute("contenteditable");
+        el.removeAttribute("data-inspect-editing");
+        const now = el.textContent;
+        if (now !== this._origText) {
+          logChange({
+            type: "text",
+            id: el.getAttribute("data-inspect-id"),
+            from: this._origText,
+            to: now,
+            label: elementLabel(el),
+            selector: cssPath(el)
+          });
+        }
         this.el = null;
       }
       if (store.get().editing) store.set({ editing: false });
@@ -1321,7 +1493,8 @@ font-weight: ${t.weight};`, "Type style copied")
   };
 
   // src/core/dragMove.js
-  var THRESHOLD = 5;
+  var THRESHOLD = 4;
+  var MOVE_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>';
   var DragMove = class {
     constructor(onReorder) {
       this.onReorder = onReorder;
@@ -1332,29 +1505,74 @@ font-weight: ${t.weight};`, "Type style copied")
           background: "#58aeff",
           borderRadius: "2px",
           pointerEvents: "none",
-          zIndex: "2147483645",
+          zIndex: "2147483644",
           display: "none",
           boxShadow: "0 0 6px rgba(88,174,255,.8)"
         }
       });
-      document.documentElement.appendChild(this.indicator);
+      this.handle = h("div", {
+        "data-inspect-ui": "",
+        title: "Drag to reorder",
+        html: MOVE_ICON,
+        style: {
+          position: "fixed",
+          width: "26px",
+          height: "26px",
+          borderRadius: "999px",
+          display: "none",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "rgba(0,0,0,0.82)",
+          border: "1px solid rgba(255,255,255,0.18)",
+          color: "#fff",
+          cursor: "grab",
+          zIndex: "2147483645",
+          boxShadow: "0 4px 14px rgba(0,0,0,.5)",
+          backdropFilter: "blur(6px)"
+        }
+      });
+      document.documentElement.append(this.indicator, this.handle);
       this._down = this._down.bind(this);
       this._move = this._move.bind(this);
       this._up = this._up.bind(this);
+      this._reposition = this._reposition.bind(this);
+      this._sync = this._sync.bind(this);
     }
     start() {
-      document.addEventListener("mousedown", this._down, true);
+      this.handle.addEventListener("mousedown", this._down, true);
+      this.handle.addEventListener("mouseenter", () => this.handle.style.background = "#58aeff");
+      this.handle.addEventListener("mouseleave", () => this.handle.style.background = "rgba(0,0,0,0.82)");
+      this.unsub = store.subscribe(this._sync);
+      window.addEventListener("scroll", this._reposition, true);
+      window.addEventListener("resize", this._reposition, true);
     }
     stop() {
-      document.removeEventListener("mousedown", this._down, true);
+      var _a;
+      (_a = this.unsub) == null ? void 0 : _a.call(this);
+      window.removeEventListener("scroll", this._reposition, true);
+      window.removeEventListener("resize", this._reposition, true);
       this.indicator.remove();
+      this.handle.remove();
+    }
+    // Show/hide the handle based on whether an element is selected.
+    _sync() {
+      const s = store.get();
+      const show = s.selectedEl && !s.dragging && !s.editing;
+      this.handle.style.display = show ? "flex" : "none";
+      if (show) this._reposition();
+    }
+    _reposition() {
+      const el = store.get().selectedEl;
+      if (!el || this.dragging) return;
+      const r = el.getBoundingClientRect();
+      this.handle.style.left = Math.round(Math.max(4, r.left - 8)) + "px";
+      this.handle.style.top = Math.round(Math.max(4, r.top - 8)) + "px";
     }
     _down(e) {
-      if (e.button !== 0 || isOwnUI(e.target)) return;
-      const sel = store.get().selectedEl;
-      if (!sel) return;
-      const el = document.elementFromPoint(e.clientX, e.clientY);
-      if (!el || el !== sel && !sel.contains(el)) return;
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (!store.get().selectedEl) return;
       this.sx = e.clientX;
       this.sy = e.clientY;
       this.armed = true;
@@ -1369,6 +1587,7 @@ font-weight: ${t.weight};`, "Type style copied")
         this.dragging = true;
         store.set({ dragging: true });
         document.documentElement.style.cursor = "grabbing";
+        this.handle.style.display = "none";
       }
       this._updateTarget(e);
     }
@@ -1381,18 +1600,19 @@ font-weight: ${t.weight};`, "Type style copied")
       const sib = siblings.find((s) => s === under || s.contains(under));
       if (!sib || sib === el) {
         this.ref = void 0;
-        return this.indicator.style.display = "none";
+        this.indicator.style.display = "none";
+        return;
       }
-      const row = /row/.test(getComputedStyle(parent).flexDirection) || getComputedStyle(parent).display.includes("inline");
+      const cs = getComputedStyle(parent);
+      const row = /row/.test(cs.flexDirection) || cs.display.includes("inline") || cs.display === "grid" && cs.gridAutoFlow.includes("column");
       const r = sib.getBoundingClientRect();
       const after = row ? e.clientX > r.left + r.width / 2 : e.clientY > r.top + r.height / 2;
       this.ref = after ? sib.nextElementSibling : sib;
-      if (this.ref === el) this.ref = after ? el.nextElementSibling : el;
       if (row) {
         const x = after ? r.right : r.left;
         Object.assign(this.indicator.style, {
           display: "block",
-          left: x - 1 + "px",
+          left: x - 1.5 + "px",
           top: r.top + "px",
           width: "3px",
           height: r.height + "px"
@@ -1402,7 +1622,7 @@ font-weight: ${t.weight};`, "Type style copied")
         Object.assign(this.indicator.style, {
           display: "block",
           left: r.left + "px",
-          top: y - 1 + "px",
+          top: y - 1.5 + "px",
           width: r.width + "px",
           height: "3px"
         });
@@ -1432,6 +1652,7 @@ font-weight: ${t.weight};`, "Type style copied")
         document.addEventListener("click", swallow, true);
         (_a = this.onReorder) == null ? void 0 : _a.call(this, el);
       }
+      this._sync();
     }
   };
 
@@ -1699,6 +1920,41 @@ ${fontFace}
 .dock-btn svg, .dock-circle svg { width: 20px; height: 20px; }
 .dock-sep { width: 24px; height: 1px; background: var(--line); margin: 1px 0; }
 
+/* ---------- Change log ---------- */
+.log-list { display: flex; flex-direction: column; gap: 6px; }
+.log-item {
+  display: flex; align-items: baseline; gap: 10px;
+  background: var(--field); border-radius: 10px; padding: 8px 10px;
+}
+.log-el { color: var(--blue); font-size: 14px; font-weight: 600; flex: none; max-width: 45%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-desc { color: var(--text); font-size: 14px; font-family: ui-monospace, Menlo, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-hint { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+.ai-prompt { white-space: pre-wrap; color: #cdd3e0; font-size: 12.5px; }
+
+/* ---------- Custom dropdown ---------- */
+.field.select-like.open { border-color: var(--blue); }
+.sel-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); font-size: 18px; font-weight: 500; }
+.dropdown-menu {
+  position: fixed; z-index: 2147483647;
+  background: #1b1b1b; border: 1px solid var(--tool-border); border-radius: 12px;
+  padding: 6px; max-height: 300px; overflow-y: auto;
+  box-shadow: 0 14px 44px rgba(0,0,0,.6);
+  font-family: var(--font); color: var(--text);
+}
+.dropdown-menu::-webkit-scrollbar { width: 8px; }
+.dropdown-menu::-webkit-scrollbar-thumb { background: var(--field-2); border-radius: 8px; }
+.dropdown-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  font-size: 16px; font-weight: 500;
+}
+.dropdown-item:hover { background: var(--field-2); }
+.dropdown-item.active { color: var(--blue); }
+.dropdown-check { width: 15px; height: 15px; display: grid; place-items: center; flex: none; }
+
 /* ---------- Custom tooltip ---------- */
 .tooltip {
   position: fixed; z-index: 2147483647; pointer-events: none;
@@ -1780,7 +2036,7 @@ ${fontFace}
       this.panel.render();
     }
     select(el) {
-      store.set({ selectedEl: el });
+      store.set({ selectedEl: el, collapsed: false, view: "design" });
       this.overlay.select(el);
       this.panel.set(el);
     }
@@ -1856,7 +2112,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.5.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.6.0" };
   }
   boot();
 })();

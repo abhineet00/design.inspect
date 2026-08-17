@@ -35,7 +35,7 @@ export class Toolbar {
         const v = store.get().view;
         store.set({ view: v === 'assets' ? 'design' : 'assets', collapsed: false });
       }),
-      this.codeBtn = dockBtn('file-diff', 'Generated CSS', () => store.set({ view: 'code', collapsed: false })),
+      this.codeBtn = dockBtn('file-diff', 'Changes & AI prompt', () => store.set({ view: 'changes', collapsed: false })),
       this.htmlBtn = dockBtn('html-file-01', 'HTML', () => store.set({ view: 'html', collapsed: false })),
       sep(),
       dockBtn('laptop-phone-sync', 'Toggle responsive preview', () => this.api.toggleResponsive?.()),
@@ -52,7 +52,7 @@ export class Toolbar {
     const s = store.get();
     this.pauseBtn?.classList.toggle('active', s.active);
     this.assetsBtn?.classList.toggle('active', s.view === 'assets');
-    this.codeBtn?.classList.toggle('active', s.view === 'code');
+    this.codeBtn?.classList.toggle('active', s.view === 'changes');
     this.htmlBtn?.classList.toggle('active', s.view === 'html');
   }
 }

@@ -6,6 +6,7 @@ import { h, round, elementLabel } from '../core/util.js';
 import { readModel, composeTransform } from '../core/styleModel.js';
 import { setProp, generateCss, clearAll } from '../core/liveStyles.js';
 import { collectAll } from '../core/assets.js';
+import { getLog, describe, generateAiPrompt, clearLog } from '../core/changeLog.js';
 import { icon } from '../icons/index.js';
 import {
   field, selectField, iconButtons, colorLine, section, labeled, spacingBox,
@@ -28,10 +29,10 @@ export class Panel {
     this.el.append(this._head());
     const body = h('div', { class: 'panel-body' });
     if (st.view === 'assets') this._assets(body);
+    else if (st.view === 'changes') this._changes(body);
     else if (!this.selected) {
       body.append(h('div', { class: 'empty', text: 'Pick an element on the page to inspect and edit its styles.' }));
-    } else if (st.view === 'code') this._code(body);
-    else if (st.view === 'html') this._html(body);
+    } else if (st.view === 'html') this._html(body);
     else this._design(body);
     this.el.append(body);
   }
@@ -44,8 +45,8 @@ export class Panel {
         h('div', { class: 'head-top' }, [
           h('div', { class: 'head-title', text: 'Assets' }),
           h('div', { class: 'head-actions' }, [
-            hbtn('minimize-screen', 'Collapse panel', () => store.set({ collapsed: true })),
-            hbtn('x', 'Close', () => window.InspectCSS?.destroy()),
+            hbtn('minimize-screen', 'Close panel', () => store.set({ collapsed: true })),
+            hbtn('x', 'Close panel', () => store.set({ collapsed: true })),
           ]),
         ]),
         h('div', { class: 'crumb', style: { color: 'var(--muted)' }, text: 'Everything this page uses' }),
@@ -59,8 +60,8 @@ export class Panel {
         h('div', { class: 'head-title', text: el ? elementLabel(el) || m.tag : 'InspectCSS' }),
         h('div', { class: 'head-actions' }, [
           hbtn('delete02', 'Reset all edits', () => { clearAll(); this.render(); }, 'danger'),
-          hbtn('minimize-screen', 'Collapse panel', () => store.set({ collapsed: true })),
-          hbtn('x', 'Close', () => window.InspectCSS?.destroy()),
+          hbtn('minimize-screen', 'Close panel', () => store.set({ collapsed: true })),
+          hbtn('x', 'Close panel (Exit InspectCSS from the left dock)', () => store.set({ collapsed: true })),
         ]),
       ]),
       el ? h('div', { class: 'crumb' }, crumb.map((c) => h('span', { text: c }))) : null,
@@ -76,6 +77,8 @@ export class Panel {
     const el = this.selected;
     const m = readModel(el);
     const on = (prop) => (v) => setProp(el, prop, v);
+    // For length props whose field hides the unit: append px to bare numbers.
+    const onPx = (prop) => (v) => setProp(el, prop, /^-?[\d.]+$/.test(String(v).trim()) ? v + 'px' : v);
 
     // ----- Position -----
     const t = m.transform;
@@ -114,8 +117,8 @@ export class Panel {
         onChange: on('display'),
       })),
       h('div', { class: 'row' }, [
-        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, sm: true, onChange: on('row-gap') })),
-        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, sm: true, onChange: on('column-gap') })),
+        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, sm: true, onChange: onPx('row-gap') })),
+        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, sm: true, onChange: onPx('column-gap') })),
       ]),
       h('div', { class: 'row' }, [
         labeled('Horizontal Align', selectField({ value: m.layout.justify, options: [['flex-start', 'Start'], ['center', 'Center'], ['flex-end', 'End'], ['space-between', 'Between']], onChange: on('justify-content') })),
@@ -148,12 +151,12 @@ export class Panel {
       h('div', { class: 'row' }, [
         labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
         labeled('Corner', h('div', { class: 'corner-mix' }, [
-          field({ iconName: 'full-screen', value: mixed ? 'mix' : m.radius.all, showUnit: false, onChange: on('border-radius') }),
-          iconButtons([{ icon: 'full-screen', title: 'Link corners' }], { onPick: () => on('border-radius')(m.radius.tl) }),
+          field({ iconName: 'full-screen', value: mixed ? 'mix' : m.radius.all, showUnit: false, onChange: onPx('border-radius') }),
+          iconButtons([{ icon: 'full-screen', title: 'Link corners' }], { onPick: () => onPx('border-radius')(m.radius.tl) }),
         ])),
       ]),
       h('div', { class: 'corner-grid' }, corners.map((c) =>
-        field({ iconName: 'full-screen', value: c.v, showUnit: false, onChange: on(c.prop) }))),
+        field({ iconName: 'full-screen', value: c.v, showUnit: false, onChange: onPx(c.prop) }))),
       addRow('Fill', () => { this._fillOpen = !this._fillOpen; this.render(); }),
       this._fillOpen ? colorLine(m.background.color, on('background-color')) : null,
       addRow('Stroke', () => { this._strokeOpen = !this._strokeOpen; this.render(); }),
@@ -171,7 +174,7 @@ export class Panel {
       ]),
       h('div', { class: 'row' }, [
         labeled('Line Height', field({ iconName: 'paragraph-spacing', value: normalizeLine(m.typography.lineHeight), showUnit: false, sm: true, onChange: on('line-height') })),
-        labeled('Letter Spacing', field({ iconName: 'letter-spacing', value: m.typography.letterSpacing, showUnit: false, sm: true, onChange: on('letter-spacing') })),
+        labeled('Letter Spacing', field({ iconName: 'letter-spacing', value: m.typography.letterSpacing, showUnit: false, sm: true, onChange: onPx('letter-spacing') })),
       ]),
       h('div', { class: 'row' }, [
         labeled('Paragraph Spacing', field({ iconName: 'expand-paragraph', value: parseLenSafe(m.typography.marginBottom), sm: true, onChange: on('margin-bottom') })),
@@ -185,17 +188,48 @@ export class Panel {
     ]));
   }
 
-  // ---------------- Code view ----------------
-  _code(body) {
+  // ---------------- Changes view (change log + generated CSS + AI prompt) ----------------
+  _changes(body) {
+    const log = getLog();
     const cssText = generateCss();
-    body.append(
-      h('div', { class: 'view-actions' }, [
-        h('button', { class: 'btn primary', text: 'Copy CSS', onclick: () => this._copy() }),
-        h('button', { class: 'btn', text: 'Reset', onclick: () => { clearAll(); this.render(); } }),
-      ]),
+    const prompt = generateAiPrompt();
+
+    body.append(h('div', { class: 'view-actions' }, [
+      h('button', { class: 'btn primary', text: 'Copy CSS', onclick: () => this._copy() }),
+      h('button', { class: 'btn', text: 'Copy AI prompt', onclick: () => {
+        if (prompt) navigator.clipboard?.writeText(prompt).then(() => this._toast('AI prompt copied'));
+      } }),
+      h('button', { class: 'btn', text: 'Clear', onclick: () => { clearLog(); this.render(); } }),
+    ]));
+
+    if (!log.length) {
+      body.append(h('div', { class: 'empty', text: 'No changes yet. Edit a property, colour or text and every change is logged here.' }));
+      return;
+    }
+
+    // Change log list
+    body.append(assetSection('Change log', log.length,
+      h('div', { class: 'log-list' }, [...log].reverse().map((e) =>
+        h('div', { class: 'log-item' }, [
+          h('span', { class: 'log-el', text: e.label || e.selector }),
+          h('span', { class: 'log-desc', text: describe(e) }),
+        ])
+      ))
+    ));
+
+    // AI prompt preview
+    body.append(assetSection('AI prompt', 0,
+      h('div', {}, [
+        h('div', { class: 'ai-hint', text: 'Paste this into any AI to apply these changes to your codebase.' }),
+        h('pre', { class: 'code ai-prompt', text: prompt }),
+      ])
+    ));
+
+    // Generated CSS
+    body.append(assetSection('Generated CSS', 0,
       cssText ? h('pre', { class: 'code', html: highlight(cssText) })
-              : h('div', { class: 'empty', text: 'No edits yet. Change a property in the Design view and the generated CSS appears here.' })
-    );
+              : h('div', { class: 'empty', text: 'No CSS edits.' })
+    ));
   }
 
   _html(body) {
@@ -309,7 +343,7 @@ function addRow(label, onAdd) {
 }
 function assetSection(title, count, content) {
   const head = h('div', { class: 'sec-head' }, [
-    h('span', {}, [title, h('span', { class: 'asset-count', text: String(count) })]),
+    h('span', {}, [title, count ? h('span', { class: 'asset-count', text: String(count) }) : null]),
     h('span', { class: 'chev', html: icon('chevron-down') }),
   ]);
   const sec = h('div', { class: 'section' }, [head, h('div', { class: 'sec-content' }, [content])]);

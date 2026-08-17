@@ -3,7 +3,9 @@
 // normally; committing on blur / Enter / Escape restores picking.
 
 import { store } from './store.js';
-import { isOwnUI } from './util.js';
+import { isOwnUI, ensureInspectId, elementLabel } from './util.js';
+import { cssPath } from './selector.js';
+import { logChange } from './changeLog.js';
 
 export class TextEditor {
   constructor(onChange) {
@@ -43,7 +45,8 @@ export class TextEditor {
     store.set({ editing: true, selectedEl: el });
 
     this.el = el;
-    this._prevWS = el.style.whiteSpace;
+    this._origText = el.textContent;
+    ensureInspectId(el);
     el.setAttribute('contenteditable', 'true');
     el.setAttribute('data-inspect-editing', '');
     el.focus();
@@ -70,8 +73,16 @@ export class TextEditor {
   _finish() {
     document.removeEventListener('keydown', this._onKey, true);
     if (this.el) {
-      this.el.removeAttribute('contenteditable');
-      this.el.removeAttribute('data-inspect-editing');
+      const el = this.el;
+      el.removeAttribute('contenteditable');
+      el.removeAttribute('data-inspect-editing');
+      const now = el.textContent;
+      if (now !== this._origText) {
+        logChange({
+          type: 'text', id: el.getAttribute('data-inspect-id'),
+          from: this._origText, to: now, label: elementLabel(el), selector: cssPath(el),
+        });
+      }
       this.el = null;
     }
     if (store.get().editing) store.set({ editing: false });

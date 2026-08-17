@@ -50,21 +50,79 @@ export function field({ key, iconName, value, unit = 'px', onChange, showUnit = 
   ]);
 }
 
-/** A <select> styled as a field, with the design's chevron. */
+const CHECK_SVG =
+  '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>';
+
+let openMenuState = null;
+function closeMenu() {
+  if (!openMenuState) return;
+  const { menu, anchor, onDoc, onKey } = openMenuState;
+  menu.remove();
+  anchor.classList.remove('open');
+  document.removeEventListener('mousedown', onDoc, true);
+  document.removeEventListener('keydown', onKey, true);
+  window.removeEventListener('scroll', onDoc, true);
+  openMenuState = null;
+}
+function openMenu(anchor, opts, current, onPick) {
+  if (openMenuState && openMenuState.anchor === anchor) return closeMenu();
+  closeMenu();
+  const root = anchor.getRootNode();
+  const wrap = (root.querySelector && root.querySelector('.wrap')) || document.body;
+
+  const menu = h('div', { class: 'dropdown-menu', 'data-inspect-ui': '' },
+    opts.map(([v, l]) => {
+      const isActive = String(v) === String(current);
+      const item = h('div', { class: 'dropdown-item' + (isActive ? ' active' : '') }, [
+        h('span', { text: l }),
+        isActive ? h('span', { class: 'dropdown-check', html: CHECK_SVG }) : null,
+      ]);
+      item.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onPick(v); closeMenu(); });
+      return item;
+    })
+  );
+  wrap.appendChild(menu);
+
+  const r = anchor.getBoundingClientRect();
+  menu.style.left = Math.round(r.left) + 'px';
+  menu.style.top = Math.round(r.bottom + 4) + 'px';
+  menu.style.minWidth = Math.round(r.width) + 'px';
+  const mr = menu.getBoundingClientRect();
+  if (mr.bottom > window.innerHeight - 8) menu.style.top = Math.round(r.top - mr.height - 4) + 'px';
+  const active = menu.querySelector('.dropdown-item.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
+
+  anchor.classList.add('open');
+  const onDoc = (e) => { if (!e.composedPath().includes(menu) && !e.composedPath().includes(anchor)) closeMenu(); };
+  const onKey = (e) => { if (e.key === 'Escape') closeMenu(); };
+  setTimeout(() => {
+    document.addEventListener('mousedown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', onDoc, true);
+  }, 0);
+  openMenuState = { menu, anchor, onDoc, onKey };
+}
+
+/** A custom dropdown styled as a field — matches the design language. */
 export function selectField({ value, options, onChange, iconName, key, sm = true }) {
-  const sel = h('select', {});
-  for (const opt of options) {
-    const [v, l] = Array.isArray(opt) ? opt : [opt, opt];
-    const o = h('option', { value: v, text: l });
-    if (String(v) === String(value)) o.selected = true;
-    sel.appendChild(o);
-  }
-  sel.addEventListener('change', () => onChange(sel.value));
-  return h('div', { class: 'field select-like' + (sm ? ' sm' : '') }, [
+  const opts = options.map((o) => (Array.isArray(o) ? o : [o, o]));
+  const current = opts.find(([v]) => String(v) === String(value));
+  const valueEl = h('span', { class: 'sel-value', text: current ? current[1] : (value ?? '') });
+  const field = h('div', { class: 'field select-like' + (sm ? ' sm' : ''), tabindex: '0' }, [
     iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null),
-    sel,
+    valueEl,
     chevMini(),
   ]);
+  const open = () => openMenu(field, opts, value, (v) => {
+    value = v;
+    const nl = opts.find(([ov]) => String(ov) === String(v));
+    valueEl.textContent = nl ? nl[1] : v;
+    onChange(v);
+  });
+  field.addEventListener('mousedown', (e) => { e.preventDefault(); open(); });
+  field.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  return field;
 }
 
 /** A row of icon toggle buttons (alignment, flips, text-align). */

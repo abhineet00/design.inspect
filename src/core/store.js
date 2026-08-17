@@ -12,6 +12,7 @@ const state = {
   collapsed: false,
   editing: false,               // inline text editing in progress
   dragging: false,              // drag-to-reorder in progress
+  changeLog: [],                // chronological record of every change made
 };
 
 const subs = new Set();

@@ -2,8 +2,9 @@
 // and records them so we can regenerate copyable CSS.
 
 import { store } from './store.js';
-import { ensureInspectId, inspectIdSelector } from './util.js';
+import { ensureInspectId, inspectIdSelector, elementLabel } from './util.js';
 import { cssPath } from './selector.js';
+import { logChange } from './changeLog.js';
 
 const STYLE_ID = 'inspect-css-live-styles';
 
@@ -61,6 +62,8 @@ export function setProp(el, prop, value) {
   const id = ensureInspectId(el);
   const { edits, pseudo } = store.get();
   const key = pseudo === 'none' ? id : `${id}::${pseudo}`;
+  // Capture the pre-edit value (for the change log) before applying.
+  const from = (edits.get(key)?.props.get(prop)) ?? getComputedStyle(el).getPropertyValue(prop).trim();
   let entry = edits.get(key);
   if (!entry) {
     entry = {
@@ -76,6 +79,9 @@ export function setProp(el, prop, value) {
   if (entry.props.size === 0) edits.delete(key);
   render();
   store.set({ edits });
+  if (value !== '' && value != null) {
+    logChange({ type: 'css', id, prop, from, to: value, pseudo, label: elementLabel(el), selector: entry.selector });
+  }
 }
 
 export function getEditedProps(el, pseudo = 'none') {

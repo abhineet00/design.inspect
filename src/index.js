@@ -75,7 +75,8 @@ class App {
   select(el) {
     // Stay in picking mode after a selection: hovering keeps showing guides and
     // you can click another element at any time. The pause button stops picking.
-    store.set({ selectedEl: el });
+    // Selecting always shows that element's properties and reopens the panel.
+    store.set({ selectedEl: el, collapsed: false, view: 'design' });
     this.overlay.select(el);
     this.panel.set(el);
   }
@@ -143,7 +144,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.5.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.6.0' };
 }
 
 boot();

@@ -256,6 +256,41 @@ ${fontFace}
 .dock-btn svg, .dock-circle svg { width: 20px; height: 20px; }
 .dock-sep { width: 24px; height: 1px; background: var(--line); margin: 1px 0; }
 
+/* ---------- Change log ---------- */
+.log-list { display: flex; flex-direction: column; gap: 6px; }
+.log-item {
+  display: flex; align-items: baseline; gap: 10px;
+  background: var(--field); border-radius: 10px; padding: 8px 10px;
+}
+.log-el { color: var(--blue); font-size: 14px; font-weight: 600; flex: none; max-width: 45%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-desc { color: var(--text); font-size: 14px; font-family: ui-monospace, Menlo, monospace;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-hint { color: var(--muted); font-size: 14px; margin-bottom: 8px; }
+.ai-prompt { white-space: pre-wrap; color: #cdd3e0; font-size: 12.5px; }
+
+/* ---------- Custom dropdown ---------- */
+.field.select-like.open { border-color: var(--blue); }
+.sel-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); font-size: 18px; font-weight: 500; }
+.dropdown-menu {
+  position: fixed; z-index: 2147483647;
+  background: #1b1b1b; border: 1px solid var(--tool-border); border-radius: 12px;
+  padding: 6px; max-height: 300px; overflow-y: auto;
+  box-shadow: 0 14px 44px rgba(0,0,0,.6);
+  font-family: var(--font); color: var(--text);
+}
+.dropdown-menu::-webkit-scrollbar { width: 8px; }
+.dropdown-menu::-webkit-scrollbar-thumb { background: var(--field-2); border-radius: 8px; }
+.dropdown-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 8px 10px; border-radius: 8px; cursor: pointer; white-space: nowrap;
+  font-size: 16px; font-weight: 500;
+}
+.dropdown-item:hover { background: var(--field-2); }
+.dropdown-item.active { color: var(--blue); }
+.dropdown-check { width: 15px; height: 15px; display: grid; place-items: center; flex: none; }
+
 /* ---------- Custom tooltip ---------- */
 .tooltip {
   position: fixed; z-index: 2147483647; pointer-events: none;
