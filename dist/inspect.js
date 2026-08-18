@@ -757,18 +757,78 @@ ${body}
   function chevMini() {
     return h("span", { class: "chev-mini", html: icon("chevron-down") });
   }
-  function field({ key, iconName, value, unit = "px", onChange, showUnit = true, sm = false }) {
+  var UNIT_OPTIONS = ["px", "%", "em", "rem", "vw", "vh", "auto"];
+  function attachScrub(handle, input, commit, onDone) {
+    handle.classList.add("scrub");
+    handle.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const startX = e.clientX;
+      const startV = parseFloat(input.value) || 0;
+      let moved = false;
+      const onMove = (ev) => {
+        const dx = ev.clientX - startX;
+        if (!moved && Math.abs(dx) < 2) return;
+        moved = true;
+        input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+        commit();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove, true);
+        document.removeEventListener("mouseup", onUp, true);
+        document.documentElement.style.cursor = "";
+        if (moved) onDone == null ? void 0 : onDone();
+      };
+      document.addEventListener("mousemove", onMove, true);
+      document.addEventListener("mouseup", onUp, true);
+      document.documentElement.style.cursor = "ew-resize";
+    });
+  }
+  function attachInputScrub(input, commit, onDone) {
+    input.addEventListener("mousedown", (e) => {
+      if (e.button !== 0) return;
+      const startX = e.clientX;
+      const startV = parseFloat(input.value) || 0;
+      let moved = false;
+      const onMove = (ev) => {
+        var _a;
+        const dx = ev.clientX - startX;
+        if (!moved && Math.abs(dx) < 3) return;
+        if (!moved) {
+          moved = true;
+          input.blur();
+          (_a = window.getSelection()) == null ? void 0 : _a.removeAllRanges();
+          document.documentElement.style.cursor = "ew-resize";
+        }
+        input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+        commit();
+      };
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove, true);
+        document.removeEventListener("mouseup", onUp, true);
+        document.documentElement.style.cursor = "";
+        if (moved) onDone == null ? void 0 : onDone();
+      };
+      document.addEventListener("mousemove", onMove, true);
+      document.addEventListener("mouseup", onUp, true);
+    });
+  }
+  function field({ key, iconName, value, unit = "px", onChange, showUnit = true, sm = false, scrub = true, onDone }) {
     const parsed = parseLength(value);
     const hadUnit = /[a-z%]/i.test(String(value != null ? value : ""));
     const input = h("input", { value: parsed.value, type: "text", inputmode: "decimal" });
-    const unitEl = showUnit ? h("span", { class: "unit", text: hadUnit ? parsed.unit : unit }) : null;
+    const unitEl = showUnit ? h("span", { class: "unit unit-pick", text: hadUnit ? parsed.unit : unit }) : null;
     const commit = () => {
       const raw = input.value.trim();
       if (raw === "") return onChange("");
       const numeric = /^-?[\d.]+$/.test(raw);
       onChange(numeric && showUnit ? raw + ((unitEl == null ? void 0 : unitEl.textContent) || unit) : raw);
     };
-    input.addEventListener("change", commit);
+    input.addEventListener("change", () => {
+      commit();
+      onDone == null ? void 0 : onDone();
+    });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") return input.blur();
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
@@ -779,18 +839,19 @@ ${body}
       }
     });
     if (showUnit && unitEl) {
-      const units = ["px", "%", "em", "rem", "vw", "vh"];
-      unitEl.style.cursor = "pointer";
-      unitEl.addEventListener("click", () => {
-        unitEl.textContent = units[(units.indexOf(unitEl.textContent) + 1) % units.length];
-        commit();
+      unitEl.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openMenu(unitEl, UNIT_OPTIONS.map((u) => [u, u]), unitEl.textContent, (u) => {
+          unitEl.textContent = u;
+          commit();
+          onDone == null ? void 0 : onDone();
+        });
       });
     }
-    return h("div", { class: "field" + (sm ? " sm" : "") }, [
-      iconName ? ico(iconName) : key ? h("span", { class: "fk", text: key }) : null,
-      input,
-      unitEl
-    ]);
+    const handle = iconName ? ico(iconName) : key ? h("span", { class: "fk", text: key }) : null;
+    if (handle && scrub) attachScrub(handle, input, commit, onDone);
+    return h("div", { class: "field" + (sm ? " sm" : "") }, [handle, input, unitEl]);
   }
   var CHECK_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 6.5"/></svg>';
   var openMenuState = null;
@@ -965,13 +1026,18 @@ ${body}
   function labeled(label, node) {
     return h("div", { class: "stack" }, [h("span", { class: "label", text: label }), node]);
   }
-  function spacingBox(sides2, onChange) {
+  function spacingBox(sides2, onChange, onDone) {
     const edge = (kind, side) => {
       const inp = h("input", { class: "sp-edge", value: parseLength(sides2[kind][side]).value });
-      inp.addEventListener("change", () => {
-        const raw = inp.value.trim();
+      const commit = () => {
+        const raw = String(inp.value).trim();
         onChange(`${kind}-${side}`, /^-?[\d.]+$/.test(raw) ? raw + "px" : raw);
+      };
+      inp.addEventListener("change", () => {
+        commit();
+        onDone == null ? void 0 : onDone();
       });
+      attachInputScrub(inp, commit, onDone);
       return inp;
     };
     const box = (kind, cls, label, inner) => h("div", { class: cls }, [
@@ -990,8 +1056,9 @@ ${body}
 
   // src/ui/panel.js
   var Panel = class {
-    constructor(root) {
+    constructor(root, api = {}) {
       this.root = root;
+      this.api = api;
       this.el = h("div", { class: "panel", "data-inspect-ui": "" });
       root.appendChild(this.el);
       this._drag();
@@ -1002,6 +1069,8 @@ ${body}
     }
     render() {
       const st = store.get();
+      const prevBody = this.el.querySelector(".panel-body");
+      const prevScroll = prevBody ? prevBody.scrollTop : 0;
       this.el.classList.toggle("hidden", st.collapsed);
       this.el.innerHTML = "";
       this.el.append(this._head());
@@ -1013,6 +1082,7 @@ ${body}
       } else if (st.view === "html") this._html(body);
       else this._design(body);
       this.el.append(body);
+      body.scrollTop = prevScroll;
     }
     // ---------------- Header ----------------
     _head() {
@@ -1055,6 +1125,7 @@ ${body}
       const m = readModel(el);
       const on = (prop) => (v) => setProp(el, prop, v);
       const onPx = (prop) => (v) => setProp(el, prop, /^-?[\d.]+$/.test(String(v).trim()) ? v + "px" : v);
+      const sync = () => this.render();
       const t = m.transform;
       const setT = (patch) => {
         Object.assign(t, patch);
@@ -1075,9 +1146,11 @@ ${body}
           field({ key: "Y", value: t.ty + "px", onChange: (v) => setT({ ty: parseFloat(v) || 0 }) })
         ])),
         labeled("Rotation", h("div", { class: "rot-row" }, [
-          field({ iconName: "rotate01", value: t.rotate + "", showUnit: false, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
-          iconButtons([{ icon: "image-flip-horizontal", title: "Flip horizontal" }], { grow: true, onPick: () => flip(el, "x") }),
-          iconButtons([{ icon: "image-flip-vertical", title: "Flip vertical" }], { grow: true, onPick: () => flip(el, "y") })
+          field({ iconName: "rotate01", value: t.rotate + "", showUnit: false, scrub: true, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
+          iconButtons([
+            { icon: "image-flip-horizontal", title: "Flip horizontal", axis: "x" },
+            { icon: "image-flip-vertical", title: "Flip vertical", axis: "y" }
+          ], { grow: true, onPick: (b) => flip(el, b.axis) })
         ]))
       ]));
       const linked = !!this._sizeLinked;
@@ -1102,12 +1175,12 @@ ${body}
       };
       body.append(section("Layout", [
         labeled("Size", h("div", { class: "size-row" }, [
-          field({ key: "W", value: m.layout.width, onChange: onW }),
+          field({ key: "W", value: m.layout.width, onDone: sync, onChange: onW }),
           linkToggle(linked, () => {
             this._sizeLinked = !linked;
             this.render();
           }),
-          field({ key: "H", value: m.layout.height, onChange: onH })
+          field({ key: "H", value: m.layout.height, onDone: sync, onChange: onH })
         ])),
         labeled("Display", selectField({
           value: m.layout.display,
@@ -1125,26 +1198,26 @@ ${body}
       ]));
       body.append(section("Spacing", [
         labeled("Padding", h("div", { class: "row" }, [
-          field({ iconName: "horizontal-resize", value: m.spacing.padding.left, onChange: (v) => {
+          field({ iconName: "horizontal-resize", value: m.spacing.padding.left, onDone: sync, onChange: (v) => {
             on("padding-left")(v);
             on("padding-right")(v);
           } }),
-          field({ iconName: "vertical-resize", value: m.spacing.padding.top, onChange: (v) => {
+          field({ iconName: "vertical-resize", value: m.spacing.padding.top, onDone: sync, onChange: (v) => {
             on("padding-top")(v);
             on("padding-bottom")(v);
           } })
         ])),
         labeled("Margin", h("div", { class: "row" }, [
-          field({ iconName: "horizontal-resize", value: m.spacing.margin.left, onChange: (v) => {
+          field({ iconName: "horizontal-resize", value: m.spacing.margin.left, onDone: sync, onChange: (v) => {
             on("margin-left")(v);
             on("margin-right")(v);
           } }),
-          field({ iconName: "vertical-resize", value: m.spacing.margin.top, onChange: (v) => {
+          field({ iconName: "vertical-resize", value: m.spacing.margin.top, onDone: sync, onChange: (v) => {
             on("margin-top")(v);
             on("margin-bottom")(v);
           } })
         ])),
-        spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v))
+        spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v), sync)
       ]));
       const app = [];
       const cornerExp = !!this._cornerExpanded;
@@ -1366,10 +1439,23 @@ ${body}
         tw,
         h("span", { class: "tree-tag", html: tagOpenHtml(el, hasKids && !expanded) })
       ]);
+      row.addEventListener("mouseenter", () => {
+        var _a, _b;
+        return (_b = (_a = this.api).hover) == null ? void 0 : _b.call(_a, el);
+      });
+      row.addEventListener("mouseleave", () => {
+        var _a, _b;
+        return (_b = (_a = this.api).unhover) == null ? void 0 : _b.call(_a);
+      });
       row.addEventListener("click", () => {
-        this.selected = el;
-        store.set({ selectedEl: el });
-        this.render();
+        var _a, _b;
+        (_b = (_a = this.api).unhover) == null ? void 0 : _b.call(_a);
+        if (this.api.pick) this.api.pick(el);
+        else {
+          this.selected = el;
+          store.set({ selectedEl: el, view: "design" });
+          this.render();
+        }
       });
       container.append(row);
       if (hasKids && expanded) {
@@ -2267,9 +2353,10 @@ ${fontFace}
 .label { color: var(--muted); font-size: 12.5px; font-weight: 500; margin-bottom: 4px; display: block; }
 .row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
 .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; }
-.rot-row { display: grid; grid-template-columns: 1fr 55px 55px; gap: 7px; }
-.rot-row .iconrow { height: 100%; }
-.rot-row .ibtn { border-radius: 10px; width: 100%; }
+.rot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.rot-row .iconrow { height: 100%; gap: 4px; }
+.rot-row .ibtn { height: 32px; width: 100%; border-radius: var(--r-field); background: var(--field); }
+.rot-row .ibtn svg { width: 16px; height: 16px; }
 .stack { display: flex; flex-direction: column; min-width: 0; }
 .row > *, .row-3 > *, .rot-row > *, .corner-grid > *, .corner-mix > * { min-width: 0; }
 
@@ -2289,6 +2376,9 @@ ${fontFace}
   color: var(--text); font-size: 15px; font-family: var(--font); font-weight: 500;
 }
 .field .unit { color: var(--muted); font-size: 15px; font-weight: 400; flex: none; }
+.field .unit-pick { cursor: pointer; padding: 0 1px; border-radius: 4px; }
+.field .unit-pick:hover { color: var(--text); background: var(--field-2); }
+.field .fic.scrub, .field .fk.scrub { cursor: ew-resize; }
 .field.select-like { cursor: pointer; }
 .field .chev-mini { width: 17px; height: 17px; color: var(--text); flex: none; pointer-events: none; display: grid; place-items: center; }
 
@@ -2312,21 +2402,22 @@ ${fontFace}
   display: flex; flex-direction: column; align-items: center; gap: 7px;
   padding: 7px; position: relative; width: 100%;
 }
-.sp-margin  { background: var(--field);     border-radius: 20px; }
-.sp-padding { background: var(--box-margin); border-radius: 14px; }
+.sp-margin  { background: #232323;          border-radius: 20px; }
+.sp-padding { background: var(--box-margin); border: 1px dashed #232323; border-radius: 14px; }
 .sp-size {
-  background: var(--box-content); border-radius: 10px; padding: 15px 8px;
+  background: var(--box-content); border: 1px dashed #232323; border-radius: 10px; padding: 15px 8px;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  color: var(--text); font-size: 13px; position: relative; flex: 1 0 0; min-height: 50px;
+  color: var(--text); font-size: 12px; position: relative; flex: 1 0 0; min-height: 50px;
 }
 .sp-mid { display: flex; align-items: center; gap: 7px; width: 100%; }
-.sp-tag { position: absolute; top: 5px; left: 9px; font-size: 9px; color: var(--muted); font-weight: 500; z-index: 1; }
+.sp-tag { position: absolute; top: 5px; left: 9px; font-size: 8px; color: var(--muted); font-weight: 500; z-index: 1; }
 .sp-x { color: var(--muted); }
 .sp-edge {
-  width: 28px; text-align: center; background: transparent; border: none;
-  color: var(--text); font-size: 13px; font-family: var(--font); outline: none; flex: none;
+  width: 30px; text-align: center; background: transparent; border: none;
+  color: var(--text); font-size: 12px; font-family: var(--font); outline: none; flex: none;
+  cursor: ew-resize;
 }
-.sp-edge:focus { color: var(--blue); }
+.sp-edge:focus { color: var(--blue); cursor: text; }
 
 /* ---------- Size row (W \xB7 link \xB7 H) ---------- */
 .size-row { display: flex; align-items: center; gap: 4px; }
@@ -2555,7 +2646,13 @@ ${fontFace}
       this.fontStyle.textContent = fontFace;
       document.head.appendChild(this.fontStyle);
       this.overlay = new Overlay(document.documentElement);
-      this.panel = new Panel(wrap);
+      this.panel = new Panel(wrap, {
+        hover: (el) => this.overlay.highlight(el),
+        unhover: () => {
+          if (!store.get().active) this.overlay.hideHover();
+        },
+        pick: (el) => this.select(el)
+      });
       this.tooltip = new Tooltip(wrap);
       this.toolbar = new Toolbar(wrap, {
         undo: () => {

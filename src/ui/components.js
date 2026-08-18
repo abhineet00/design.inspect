@@ -11,14 +11,72 @@ function chevMini() {
   return h('span', { class: 'chev-mini', html: icon('chevron-down') });
 }
 
-/** Field with a leading key (letter or icon) and an optional unit. */
-export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true, sm = false }) {
+const UNIT_OPTIONS = ['px', '%', 'em', 'rem', 'vw', 'vh', 'auto'];
+
+// Turn a handle (a field's leading icon/letter) into a horizontal scrubber:
+// press and drag to change the number, shift for a coarse ×10 step.
+export function attachScrub(handle, input, commit, onDone) {
+  handle.classList.add('scrub');
+  handle.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const startX = e.clientX;
+    const startV = parseFloat(input.value) || 0;
+    let moved = false;
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      if (!moved && Math.abs(dx) < 2) return;
+      moved = true;
+      input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+      commit();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('mouseup', onUp, true);
+      document.documentElement.style.cursor = '';
+      if (moved) onDone?.();
+    };
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onUp, true);
+    document.documentElement.style.cursor = 'ew-resize';
+  });
+}
+
+// Scrub directly on a numeric input: a plain click still focuses it for typing,
+// but dragging past a small threshold takes over and scrubs the value.
+export function attachInputScrub(input, commit, onDone) {
+  input.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    const startX = e.clientX;
+    const startV = parseFloat(input.value) || 0;
+    let moved = false;
+    const onMove = (ev) => {
+      const dx = ev.clientX - startX;
+      if (!moved && Math.abs(dx) < 3) return;
+      if (!moved) { moved = true; input.blur(); window.getSelection()?.removeAllRanges(); document.documentElement.style.cursor = 'ew-resize'; }
+      input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+      commit();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove, true);
+      document.removeEventListener('mouseup', onUp, true);
+      document.documentElement.style.cursor = '';
+      if (moved) onDone?.();
+    };
+    document.addEventListener('mousemove', onMove, true);
+    document.addEventListener('mouseup', onUp, true);
+  });
+}
+
+/** Field with a leading key (letter or icon) and an optional unit.
+ *  The leading handle scrubs the value; the unit opens a unit dropdown. */
+export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true, sm = false, scrub = true, onDone }) {
   const parsed = parseLength(value);
   // Only trust the parsed unit if the incoming value actually carried one;
   // otherwise use the caller's unit (e.g. '%' for opacity), not the px default.
   const hadUnit = /[a-z%]/i.test(String(value ?? ''));
   const input = h('input', { value: parsed.value, type: 'text', inputmode: 'decimal' });
-  const unitEl = showUnit ? h('span', { class: 'unit', text: hadUnit ? parsed.unit : unit }) : null;
+  const unitEl = showUnit ? h('span', { class: 'unit unit-pick', text: hadUnit ? parsed.unit : unit }) : null;
 
   const commit = () => {
     const raw = input.value.trim();
@@ -26,7 +84,7 @@ export function field({ key, iconName, value, unit = 'px', onChange, showUnit = 
     const numeric = /^-?[\d.]+$/.test(raw);
     onChange(numeric && showUnit ? raw + (unitEl?.textContent || unit) : raw);
   };
-  input.addEventListener('change', commit);
+  input.addEventListener('change', () => { commit(); onDone?.(); });
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') return input.blur();
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -36,18 +94,18 @@ export function field({ key, iconName, value, unit = 'px', onChange, showUnit = 
     }
   });
   if (showUnit && unitEl) {
-    const units = ['px', '%', 'em', 'rem', 'vw', 'vh'];
-    unitEl.style.cursor = 'pointer';
-    unitEl.addEventListener('click', () => {
-      unitEl.textContent = units[(units.indexOf(unitEl.textContent) + 1) % units.length];
-      commit();
+    unitEl.addEventListener('mousedown', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      openMenu(unitEl, UNIT_OPTIONS.map((u) => [u, u]), unitEl.textContent, (u) => {
+        unitEl.textContent = u; commit(); onDone?.();
+      });
     });
   }
-  return h('div', { class: 'field' + (sm ? ' sm' : '') }, [
-    iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null),
-    input,
-    unitEl,
-  ]);
+
+  const handle = iconName ? ico(iconName) : (key ? h('span', { class: 'fk', text: key }) : null);
+  if (handle && scrub) attachScrub(handle, input, commit, onDone);
+
+  return h('div', { class: 'field' + (sm ? ' sm' : '') }, [handle, input, unitEl]);
 }
 
 const CHECK_SVG =
@@ -248,13 +306,15 @@ export function labeled(label, node) {
  *   Size    (inner, #0b0b0b, r12)
  * Each box has a corner label and editable top/left/right/bottom edge values.
  */
-export function spacingBox(sides, onChange) {
+export function spacingBox(sides, onChange, onDone) {
   const edge = (kind, side) => {
     const inp = h('input', { class: 'sp-edge', value: parseLength(sides[kind][side]).value });
-    inp.addEventListener('change', () => {
-      const raw = inp.value.trim();
+    const commit = () => {
+      const raw = String(inp.value).trim();
       onChange(`${kind}-${side}`, /^-?[\d.]+$/.test(raw) ? raw + 'px' : raw);
-    });
+    };
+    inp.addEventListener('change', () => { commit(); onDone?.(); });
+    attachInputScrub(inp, commit, onDone); // drag the number to scrub; click to type
     return inp;
   };
   const box = (kind, cls, label, inner) =>

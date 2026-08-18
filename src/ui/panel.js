@@ -16,8 +16,9 @@ import {
 } from './components.js';
 
 export class Panel {
-  constructor(root) {
+  constructor(root, api = {}) {
     this.root = root;
+    this.api = api;
     this.el = h('div', { class: 'panel', 'data-inspect-ui': '' });
     root.appendChild(this.el);
     this._drag();
@@ -27,6 +28,9 @@ export class Panel {
 
   render() {
     const st = store.get();
+    // preserve scroll position across re-renders (edits re-render the body)
+    const prevBody = this.el.querySelector('.panel-body');
+    const prevScroll = prevBody ? prevBody.scrollTop : 0;
     this.el.classList.toggle('hidden', st.collapsed);
     this.el.innerHTML = '';
     this.el.append(this._head());
@@ -38,6 +42,7 @@ export class Panel {
     } else if (st.view === 'html') this._html(body);
     else this._design(body);
     this.el.append(body);
+    body.scrollTop = prevScroll;
   }
 
   // ---------------- Header ----------------
@@ -86,6 +91,9 @@ export class Panel {
     const on = (prop) => (v) => setProp(el, prop, v);
     // For length props whose field hides the unit: append px to bare numbers.
     const onPx = (prop) => (v) => setProp(el, prop, /^-?[\d.]+$/.test(String(v).trim()) ? v + 'px' : v);
+    // Re-render after a committed edit so the box visualization and the written
+    // fields stay in sync (edit one, the other reflects it).
+    const sync = () => this.render();
 
     // ----- Position -----
     const t = m.transform;
@@ -106,9 +114,11 @@ export class Panel {
         field({ key: 'Y', value: t.ty + 'px', onChange: (v) => setT({ ty: parseFloat(v) || 0 }) }),
       ])),
       labeled('Rotation', h('div', { class: 'rot-row' }, [
-        field({ iconName: 'rotate01', value: t.rotate + '', showUnit: false, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
-        iconButtons([{ icon: 'image-flip-horizontal', title: 'Flip horizontal' }], { grow: true, onPick: () => flip(el, 'x') }),
-        iconButtons([{ icon: 'image-flip-vertical', title: 'Flip vertical' }], { grow: true, onPick: () => flip(el, 'y') }),
+        field({ iconName: 'rotate01', value: t.rotate + '', showUnit: false, scrub: true, onChange: (v) => setT({ rotate: parseFloat(v) || 0 }) }),
+        iconButtons([
+          { icon: 'image-flip-horizontal', title: 'Flip horizontal', axis: 'x' },
+          { icon: 'image-flip-vertical', title: 'Flip vertical', axis: 'y' },
+        ], { grow: true, onPick: (b) => flip(el, b.axis) }),
       ])),
     ]));
 
@@ -130,9 +140,9 @@ export class Panel {
     };
     body.append(section('Layout', [
       labeled('Size', h('div', { class: 'size-row' }, [
-        field({ key: 'W', value: m.layout.width, onChange: onW }),
+        field({ key: 'W', value: m.layout.width, onDone: sync, onChange: onW }),
         linkToggle(linked, () => { this._sizeLinked = !linked; this.render(); }),
-        field({ key: 'H', value: m.layout.height, onChange: onH }),
+        field({ key: 'H', value: m.layout.height, onDone: sync, onChange: onH }),
       ])),
       labeled('Display', selectField({
         value: m.layout.display,
@@ -152,14 +162,14 @@ export class Panel {
     // ----- Spacing -----
     body.append(section('Spacing', [
       labeled('Padding', h('div', { class: 'row' }, [
-        field({ iconName: 'horizontal-resize', value: m.spacing.padding.left, onChange: (v) => { on('padding-left')(v); on('padding-right')(v); } }),
-        field({ iconName: 'vertical-resize', value: m.spacing.padding.top, onChange: (v) => { on('padding-top')(v); on('padding-bottom')(v); } }),
+        field({ iconName: 'horizontal-resize', value: m.spacing.padding.left, onDone: sync, onChange: (v) => { on('padding-left')(v); on('padding-right')(v); } }),
+        field({ iconName: 'vertical-resize', value: m.spacing.padding.top, onDone: sync, onChange: (v) => { on('padding-top')(v); on('padding-bottom')(v); } }),
       ])),
       labeled('Margin', h('div', { class: 'row' }, [
-        field({ iconName: 'horizontal-resize', value: m.spacing.margin.left, onChange: (v) => { on('margin-left')(v); on('margin-right')(v); } }),
-        field({ iconName: 'vertical-resize', value: m.spacing.margin.top, onChange: (v) => { on('margin-top')(v); on('margin-bottom')(v); } }),
+        field({ iconName: 'horizontal-resize', value: m.spacing.margin.left, onDone: sync, onChange: (v) => { on('margin-left')(v); on('margin-right')(v); } }),
+        field({ iconName: 'vertical-resize', value: m.spacing.margin.top, onDone: sync, onChange: (v) => { on('margin-top')(v); on('margin-bottom')(v); } }),
       ])),
-      spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v)),
+      spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v), sync),
     ]));
 
     // ----- Appearance -----
@@ -345,10 +355,14 @@ export class Panel {
       style: { paddingLeft: pad + 'px' } }, [
       tw, h('span', { class: 'tree-tag', html: tagOpenHtml(el, hasKids && !expanded) }),
     ]);
+    // Hover a row → highlight that element on the page (like picking).
+    row.addEventListener('mouseenter', () => this.api.hover?.(el));
+    row.addEventListener('mouseleave', () => this.api.unhover?.());
+    // Click a row → select it and open its property panel (design view).
     row.addEventListener('click', () => {
-      this.selected = el;
-      store.set({ selectedEl: el });
-      this.render();
+      this.api.unhover?.();
+      if (this.api.pick) this.api.pick(el);
+      else { this.selected = el; store.set({ selectedEl: el, view: 'design' }); this.render(); }
     });
     container.append(row);
 

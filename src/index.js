@@ -36,7 +36,11 @@ class App {
     document.head.appendChild(this.fontStyle);
 
     this.overlay = new Overlay(document.documentElement);
-    this.panel = new Panel(wrap);
+    this.panel = new Panel(wrap, {
+      hover: (el) => this.overlay.highlight(el),
+      unhover: () => { if (!store.get().active) this.overlay.hideHover(); },
+      pick: (el) => this.select(el),
+    });
     this.tooltip = new Tooltip(wrap);
     this.toolbar = new Toolbar(wrap, {
       undo: () => { undo(); this._afterHistory(); },
