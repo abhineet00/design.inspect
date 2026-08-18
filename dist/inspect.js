@@ -2576,7 +2576,9 @@ ${fontFace}
 *, *::before, *::after { box-sizing: border-box; }
 
 .wrap {
-  --panel-bg: rgba(0, 0, 0, 0.74);
+  --panel-bg: rgba(42, 42, 42, 0.86);
+  --body-bg: #0c0c0c;
+  --panel-border: rgba(175, 175, 175, 0.28);
   --field: #232323;
   --field-2: #272727;
   --field-active: #505050;
@@ -2596,7 +2598,7 @@ ${fontFace}
   --r-field: 12px;
   --r-sm: 8px;
   --r-btn: 20px;
-  --r-panel: 24px;
+  --r-panel: 28px;
 
   font-family: var(--font);
   color: var(--text);
@@ -2615,7 +2617,7 @@ ${fontFace}
   background: var(--panel-bg);
   -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
-  border: none;
+  border: 1px solid var(--panel-border);
   border-radius: var(--r-panel);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   display: flex; flex-direction: column;
@@ -2630,13 +2632,16 @@ ${fontFace}
   box-shadow: -12px 0 40px rgba(0,0,0,0.5);
 }
 .panel.docked .head { cursor: default; }
+.panel.docked .panel-body { border-radius: 0; }
 
-.panel-body { padding: 0 14px 14px; overflow-y: auto; overflow-x: hidden; }
+/* The properties body is a distinct darker card nested under the header, so the
+   lighter panel colour frames it at the top \u2014 the divided top/bottom look. */
+.panel-body { background: var(--body-bg); border-radius: 22px 22px 0 0; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; }
 .panel-body::-webkit-scrollbar { width: 9px; }
 .panel-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 9px; border: 3px solid transparent; background-clip: padding-box; }
 
 /* ---------- Header ---------- */
-.head { padding: 14px 14px 0; cursor: grab; }
+.head { padding: 16px 16px 12px; cursor: grab; }
 .head:active { cursor: grabbing; }
 .head-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 7px; }
 .head-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -2921,7 +2926,7 @@ ${fontFace}
 .t-ell { color: var(--muted); padding: 0 2px; }
 .tree-close .tree-tag { opacity: .8; }
 .tree-footer { position: sticky; bottom: 0; display: flex; gap: 7px; padding: 12px 0 2px;
-  background: linear-gradient(to top, var(--panel-bg) 70%, transparent); }
+  background: linear-gradient(to top, var(--body-bg) 70%, transparent); }
 .tree-btn { flex: 1; display: flex; align-items: center; justify-content: center; gap: 7px;
   padding: 9px 11px; border-radius: 999px; border: 1px solid var(--tool-border);
   background: var(--field); color: var(--text); font-family: var(--font); font-weight: 500;
@@ -3169,7 +3174,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.11.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.12.0" };
   }
   boot();
 })();
