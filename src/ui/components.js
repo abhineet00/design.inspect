@@ -249,10 +249,12 @@ export function colorRow(value, onChange, onRemove) {
     const v = hexInput.value.trim().replace(/^#/, '');
     if (/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) { picker.value = '#' + v; push('#' + v); }
   });
-  alphaInput.addEventListener('change', () => {
+  const commitAlpha = () => {
     alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
     push('#' + hexInput.value.trim().replace(/^#/, ''));
-  });
+  };
+  alphaInput.addEventListener('change', commitAlpha);
+  attachInputScrub(alphaInput, commitAlpha); // drag the % to scrub opacity
 
   return h('div', { class: 'color-row' }, [
     h('div', { class: 'cr-main' }, [swatch, hexInput]),

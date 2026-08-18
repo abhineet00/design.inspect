@@ -1272,10 +1272,12 @@ ${body}
         push("#" + v);
       }
     });
-    alphaInput.addEventListener("change", () => {
+    const commitAlpha = () => {
       alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
       push("#" + hexInput.value.trim().replace(/^#/, ""));
-    });
+    };
+    alphaInput.addEventListener("change", commitAlpha);
+    attachInputScrub(alphaInput, commitAlpha);
     return h("div", { class: "color-row" }, [
       h("div", { class: "cr-main" }, [swatch, hexInput]),
       h("div", { class: "cr-pct" }, [alphaInput, h("span", { class: "cr-unit", text: "%" })]),
@@ -1355,7 +1357,9 @@ ${body}
       body.scrollTop = prevScroll;
     }
     // ---------------- Header ----------------
-    _head() {
+    // `displayEl` overrides which element the card info describes (used by the
+    // HTML view to reflect the row being hovered); defaults to the selection.
+    _head(displayEl) {
       const st = store.get();
       if (st.view === "assets" || st.view === "changes") {
         const meta = st.view === "assets" ? { title: "Assets", sub: "Everything this page uses" } : { title: "Changes", sub: "Every edit you make, ready to copy" };
@@ -1372,7 +1376,7 @@ ${body}
           ])
         ]);
       }
-      const el = this.selected;
+      const el = displayEl !== void 0 ? displayEl : this.selected;
       const m = el ? readModel(el) : null;
       const crumb = el ? classChain(el) : [];
       return h("div", { class: "head" }, [
@@ -1470,26 +1474,28 @@ ${body}
           labeled("Vertical Align", selectField({ value: m.layout.align, options: [["flex-start", "Start"], ["center", "Center"], ["flex-end", "End"], ["stretch", "Stretch"]], onChange: on("align-items") }))
         ])
       ]));
+      const axisField = (iconName, aVal, bVal, propA, propB) => {
+        const mixed = aVal !== bVal;
+        return field({
+          iconName,
+          value: mixed ? "mix" : aVal,
+          showUnit: !mixed,
+          scrub: !mixed,
+          onDone: sync,
+          onChange: (v) => {
+            onPx(propA)(v);
+            onPx(propB)(v);
+          }
+        });
+      };
       body.append(section("Spacing", [
         labeled("Padding", h("div", { class: "row" }, [
-          field({ iconName: "horizontal-resize", value: m.spacing.padding.left, onDone: sync, onChange: (v) => {
-            on("padding-left")(v);
-            on("padding-right")(v);
-          } }),
-          field({ iconName: "vertical-resize", value: m.spacing.padding.top, onDone: sync, onChange: (v) => {
-            on("padding-top")(v);
-            on("padding-bottom")(v);
-          } })
+          axisField("horizontal-resize", m.spacing.padding.left, m.spacing.padding.right, "padding-left", "padding-right"),
+          axisField("vertical-resize", m.spacing.padding.top, m.spacing.padding.bottom, "padding-top", "padding-bottom")
         ])),
         labeled("Margin", h("div", { class: "row" }, [
-          field({ iconName: "horizontal-resize", value: m.spacing.margin.left, onDone: sync, onChange: (v) => {
-            on("margin-left")(v);
-            on("margin-right")(v);
-          } }),
-          field({ iconName: "vertical-resize", value: m.spacing.margin.top, onDone: sync, onChange: (v) => {
-            on("margin-top")(v);
-            on("margin-bottom")(v);
-          } })
+          axisField("horizontal-resize", m.spacing.margin.left, m.spacing.margin.right, "margin-left", "margin-right"),
+          axisField("vertical-resize", m.spacing.margin.top, m.spacing.margin.bottom, "margin-top", "margin-bottom")
         ])),
         spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v), sync)
       ]));
@@ -1499,7 +1505,7 @@ ${body}
       app.push(h("div", { class: "row" }, [
         labeled("Opacity", field({ iconName: "transparency", value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: "%", onChange: (v) => on("opacity")((parseFloat(v) || 100) / 100) })),
         labeled("Corner", h("div", { class: "corner-mix" }, [
-          field({ iconName: "full-screen", value: cornerMixed ? "mix" : m.radius.all, showUnit: false, onChange: onPx("border-radius") }),
+          field({ iconName: "full-screen", value: cornerMixed ? "mix" : m.radius.all, showUnit: false, scrub: !cornerMixed, onDone: sync, onChange: onPx("border-radius") }),
           expandBtn(cornerExp, "full-screen", cornerExp ? "Collapse corners" : "Edit each corner", () => {
             this._cornerExpanded = !cornerExp;
             this.render();
@@ -1513,7 +1519,7 @@ ${body}
           ["border-bottom-left-radius", m.radius.bl],
           ["border-bottom-right-radius", m.radius.br]
         ];
-        app.push(h("div", { class: "corner-grid" }, corners.map(([prop, v]) => field({ iconName: "full-screen", value: v, showUnit: false, onChange: onPx(prop) }))));
+        app.push(h("div", { class: "corner-grid" }, corners.map(([prop, v]) => field({ iconName: "full-screen", value: v, showUnit: false, onDone: sync, onChange: onPx(prop) }))));
       }
       const fills = getFills(el);
       const applyFills = () => {
@@ -1552,6 +1558,8 @@ ${body}
             iconName: "square",
             value: widthMixed ? "mix" : parseFloat(m.border.width) + "",
             showUnit: false,
+            scrub: !widthMixed,
+            onDone: sync,
             onChange: (v) => setProp(el, "border-width", /^-?[\d.]+$/.test(String(v).trim()) ? v + "px" : v)
           }),
           expandBtn(strokeExp, "border-all-01", strokeExp ? "Collapse sides" : "Edit each side", () => {
@@ -1566,7 +1574,7 @@ ${body}
             ["border-left-width", "stroke-left", sw.left],
             ["border-bottom-width", "stroke-bottom", sw.bottom]
           ];
-          app.push(h("div", { class: "corner-grid" }, sides2.map(([prop, ic, v]) => field({ iconName: ic, value: parseFloat(v) + "", showUnit: false, onChange: onPx(prop) }))));
+          app.push(h("div", { class: "corner-grid" }, sides2.map(([prop, ic, v]) => field({ iconName: ic, value: parseFloat(v) + "", showUnit: false, onDone: sync, onChange: onPx(prop) }))));
         }
       }
       body.append(section("Appearance", app));
@@ -1614,12 +1622,14 @@ ${body}
       const desc = h("span", { class: "cr-hex-text", text: layerLabel(layer) });
       const main = h("div", { class: "cr-main cr-main-btn" }, [swatch, desc]);
       const alpha = h("input", { class: "cr-alpha", value: Math.round(((_a = layer.alpha) != null ? _a : 1) * 100) });
-      alpha.addEventListener("change", () => {
+      const commitAlpha = () => {
         const cur = getFills(el)[i];
         cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
         applyFills();
         swatch.style.background = layerCss(cur);
-      });
+      };
+      alpha.addEventListener("change", commitAlpha);
+      attachInputScrub(alpha, commitAlpha);
       main.addEventListener("click", () => openColorPopover(main, getFills(el)[i], (updated) => {
         var _a2;
         getFills(el)[i] = updated;
@@ -1720,24 +1730,18 @@ ${body}
       const tree = h("div", { class: "domtree" });
       tree.addEventListener("mouseleave", () => {
         var _a, _b;
-        return (_b = (_a = this.api).unhover) == null ? void 0 : _b.call(_a);
+        (_b = (_a = this.api).unhover) == null ? void 0 : _b.call(_a);
+        this._showHeaderFor(this.selected);
       });
       this._renderNode(document.documentElement, tree, 0);
-      const footer = h("div", { class: "tree-footer" }, [
-        h(
-          "button",
-          { class: "tree-btn", onclick: () => store.set({ view: "design" }) },
-          [h("span", { html: TREE_ICONS.back }), "Back"]
-        ),
-        h(
-          "button",
-          { class: "tree-btn", onclick: () => store.set({ active: true }) },
-          [h("span", { html: TREE_ICONS.pick }), "Pick an element"]
-        )
-      ]);
-      body.append(tree, footer);
+      body.append(tree);
       const selRow = tree.querySelector(".tree-row.selected");
       if (selRow) setTimeout(() => selRow.scrollIntoView({ block: "center" }), 0);
+    }
+    // Swap the header's card info to describe `el` (used while hovering the tree).
+    _showHeaderFor(el) {
+      const old = this.el.querySelector(".head");
+      if (old) this.el.replaceChild(this._head(el), old);
     }
     _renderNode(el, container, depth) {
       if (el.nodeType !== 1 || el.hasAttribute && el.hasAttribute("data-inspect-ui")) return;
@@ -1765,7 +1769,8 @@ ${body}
       ]);
       row.addEventListener("mouseenter", () => {
         var _a, _b;
-        return (_b = (_a = this.api).hover) == null ? void 0 : _b.call(_a, el);
+        (_b = (_a = this.api).hover) == null ? void 0 : _b.call(_a, el);
+        this._showHeaderFor(el);
       });
       row.addEventListener("click", () => {
         var _a, _b;
@@ -3192,7 +3197,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.13.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.14.0" };
   }
   boot();
 })();

@@ -14,7 +14,7 @@ import { openColorPopover, closeColorPopover } from './colorPopover.js';
 import { icon } from '../icons/index.js';
 import {
   field, selectField, iconButtons, colorRow, section, labeled, spacingBox,
-  linkToggle, expandBtn, subHead,
+  linkToggle, expandBtn, subHead, attachInputScrub,
 } from './components.js';
 
 export class Panel {
@@ -49,7 +49,9 @@ export class Panel {
   }
 
   // ---------------- Header ----------------
-  _head() {
+  // `displayEl` overrides which element the card info describes (used by the
+  // HTML view to reflect the row being hovered); defaults to the selection.
+  _head(displayEl) {
     const st = store.get();
     // Assets and Changes are page-level views — a plain title, no element crumb.
     if (st.view === 'assets' || st.view === 'changes') {
@@ -69,7 +71,7 @@ export class Panel {
         ]),
       ]);
     }
-    const el = this.selected;
+    const el = displayEl !== undefined ? displayEl : this.selected;
     const m = el ? readModel(el) : null;
     const crumb = el ? classChain(el) : [];
     // Card info: element name (blue) + class breadcrumb (orange) stacked on the
@@ -169,14 +171,23 @@ export class Panel {
     ]));
 
     // ----- Spacing -----
+    // A combined H/V field shows "mix" when its two sides differ (e.g. after
+    // editing one side in the box). Typing/scrubbing a value re-equalises both.
+    const axisField = (iconName, aVal, bVal, propA, propB) => {
+      const mixed = aVal !== bVal;
+      return field({
+        iconName, value: mixed ? 'mix' : aVal, showUnit: !mixed, scrub: !mixed, onDone: sync,
+        onChange: (v) => { onPx(propA)(v); onPx(propB)(v); },
+      });
+    };
     body.append(section('Spacing', [
       labeled('Padding', h('div', { class: 'row' }, [
-        field({ iconName: 'horizontal-resize', value: m.spacing.padding.left, onDone: sync, onChange: (v) => { on('padding-left')(v); on('padding-right')(v); } }),
-        field({ iconName: 'vertical-resize', value: m.spacing.padding.top, onDone: sync, onChange: (v) => { on('padding-top')(v); on('padding-bottom')(v); } }),
+        axisField('horizontal-resize', m.spacing.padding.left, m.spacing.padding.right, 'padding-left', 'padding-right'),
+        axisField('vertical-resize', m.spacing.padding.top, m.spacing.padding.bottom, 'padding-top', 'padding-bottom'),
       ])),
       labeled('Margin', h('div', { class: 'row' }, [
-        field({ iconName: 'horizontal-resize', value: m.spacing.margin.left, onDone: sync, onChange: (v) => { on('margin-left')(v); on('margin-right')(v); } }),
-        field({ iconName: 'vertical-resize', value: m.spacing.margin.top, onDone: sync, onChange: (v) => { on('margin-top')(v); on('margin-bottom')(v); } }),
+        axisField('horizontal-resize', m.spacing.margin.left, m.spacing.margin.right, 'margin-left', 'margin-right'),
+        axisField('vertical-resize', m.spacing.margin.top, m.spacing.margin.bottom, 'margin-top', 'margin-bottom'),
       ])),
       spacingBox({ ...m.spacing, width: m.layout.width, height: m.layout.height }, (prop, v) => setProp(el, prop, v), sync),
     ]));
@@ -190,7 +201,7 @@ export class Panel {
     app.push(h('div', { class: 'row' }, [
       labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
       labeled('Corner', h('div', { class: 'corner-mix' }, [
-        field({ iconName: 'full-screen', value: cornerMixed ? 'mix' : m.radius.all, showUnit: false, onChange: onPx('border-radius') }),
+        field({ iconName: 'full-screen', value: cornerMixed ? 'mix' : m.radius.all, showUnit: false, scrub: !cornerMixed, onDone: sync, onChange: onPx('border-radius') }),
         expandBtn(cornerExp, 'full-screen', cornerExp ? 'Collapse corners' : 'Edit each corner', () => { this._cornerExpanded = !cornerExp; this.render(); }),
       ])),
     ]));
@@ -200,7 +211,7 @@ export class Panel {
         ['border-bottom-left-radius', m.radius.bl], ['border-bottom-right-radius', m.radius.br],
       ];
       app.push(h('div', { class: 'corner-grid' }, corners.map(([prop, v]) =>
-        field({ iconName: 'full-screen', value: v, showUnit: false, onChange: onPx(prop) }))));
+        field({ iconName: 'full-screen', value: v, showUnit: false, onDone: sync, onChange: onPx(prop) }))));
     }
 
     // Fill: an ordered list of layers (solid / gradient / image). Plus adds a
@@ -227,7 +238,7 @@ export class Panel {
       const widthMixed = new Set([sw.top, sw.right, sw.bottom, sw.left]).size > 1;
       const strokeExp = !!this._strokeSidesExpanded;
       app.push(h('div', { class: 'corner-mix' }, [
-        field({ iconName: 'square', value: widthMixed ? 'mix' : parseFloat(m.border.width) + '', showUnit: false,
+        field({ iconName: 'square', value: widthMixed ? 'mix' : parseFloat(m.border.width) + '', showUnit: false, scrub: !widthMixed, onDone: sync,
           onChange: (v) => setProp(el, 'border-width', /^-?[\d.]+$/.test(String(v).trim()) ? v + 'px' : v) }),
         expandBtn(strokeExp, 'border-all-01', strokeExp ? 'Collapse sides' : 'Edit each side', () => { this._strokeSidesExpanded = !strokeExp; this.render(); }),
       ]));
@@ -237,7 +248,7 @@ export class Panel {
           ['border-left-width', 'stroke-left', sw.left], ['border-bottom-width', 'stroke-bottom', sw.bottom],
         ];
         app.push(h('div', { class: 'corner-grid' }, sides.map(([prop, ic, v]) =>
-          field({ iconName: ic, value: parseFloat(v) + '', showUnit: false, onChange: onPx(prop) }))));
+          field({ iconName: ic, value: parseFloat(v) + '', showUnit: false, onDone: sync, onChange: onPx(prop) }))));
       }
     }
     body.append(section('Appearance', app));
@@ -280,10 +291,12 @@ export class Panel {
     const main = h('div', { class: 'cr-main cr-main-btn' }, [swatch, desc]);
 
     const alpha = h('input', { class: 'cr-alpha', value: Math.round((layer.alpha ?? 1) * 100) });
-    alpha.addEventListener('change', () => {
+    const commitAlpha = () => {
       const cur = getFills(el)[i]; cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
       applyFills(); swatch.style.background = layerCss(cur);
-    });
+    };
+    alpha.addEventListener('change', commitAlpha);
+    attachInputScrub(alpha, commitAlpha); // drag the % to scrub opacity
 
     main.addEventListener('click', () => openColorPopover(main, getFills(el)[i], (updated) => {
       getFills(el)[i] = updated;
@@ -366,21 +379,20 @@ export class Panel {
     }
 
     const tree = h('div', { class: 'domtree' });
-    // Leaving the whole tree clears the page highlight; moving between rows just
-    // updates it (each row's mouseenter re-highlights), so no flicker.
-    tree.addEventListener('mouseleave', () => this.api.unhover?.());
+    // Leaving the whole tree clears the page highlight and reverts the header to
+    // the selection; moving between rows updates both (no flicker).
+    tree.addEventListener('mouseleave', () => { this.api.unhover?.(); this._showHeaderFor(this.selected); });
     this._renderNode(document.documentElement, tree, 0);
-
-    const footer = h('div', { class: 'tree-footer' }, [
-      h('button', { class: 'tree-btn', onclick: () => store.set({ view: 'design' }) },
-        [h('span', { html: TREE_ICONS.back }), 'Back']),
-      h('button', { class: 'tree-btn', onclick: () => store.set({ active: true }) },
-        [h('span', { html: TREE_ICONS.pick }), 'Pick an element']),
-    ]);
-    body.append(tree, footer);
+    body.append(tree);
 
     const selRow = tree.querySelector('.tree-row.selected');
     if (selRow) setTimeout(() => selRow.scrollIntoView({ block: 'center' }), 0);
+  }
+
+  // Swap the header's card info to describe `el` (used while hovering the tree).
+  _showHeaderFor(el) {
+    const old = this.el.querySelector('.head');
+    if (old) this.el.replaceChild(this._head(el), old);
   }
 
   _renderNode(el, container, depth) {
@@ -403,9 +415,9 @@ export class Panel {
       style: { paddingLeft: pad + 'px' } }, [
       tw, h('span', { class: 'tree-tag', html: tagOpenHtml(el, hasKids && !expanded) }),
     ]);
-    // Hover a row → highlight that element on the page (like picking). The hide
-    // is handled once on the tree container's mouseleave, not per row.
-    row.addEventListener('mouseenter', () => this.api.hover?.(el));
+    // Hover a row → highlight that element on the page and reflect its details
+    // in the header. The hide is handled once on the tree's mouseleave.
+    row.addEventListener('mouseenter', () => { this.api.hover?.(el); this._showHeaderFor(el); });
     // Click a row → select it and open its property panel (design view).
     row.addEventListener('click', () => {
       this.api.unhover?.();
