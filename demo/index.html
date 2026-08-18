@@ -3,64 +3,409 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>InspectCSS — Demo</title>
+  <title>InspectCSS — the visual CSS editor that runs on any page</title>
+  <meta name="description" content="Hover to highlight, click to select, edit spacing, color, gradients and type live — then copy clean CSS. Free, open-source, no build step." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    :root { --brand: #4c8dff; --ink: #e7e9ee; --bg: #0b0d12; }
+    :root {
+      --bg: #08090d;
+      --bg-2: #0d0f15;
+      --surface: #12141b;
+      --surface-2: #171a22;
+      --line: rgba(255, 255, 255, 0.08);
+      --line-2: rgba(255, 255, 255, 0.14);
+      --ink: #eef1f7;
+      --ink-2: #aab2c5;
+      --muted: #6d768c;
+      --blue: #58aeff;
+      --orange: #ff8858;
+      --green: #33d69f;
+      --violet: #b36bff;
+      --yellow: #ffcb47;
+      --display: 'Quicksand', -apple-system, 'Segoe UI', sans-serif;
+      --body: 'Inter', -apple-system, 'Segoe UI', Roboto, sans-serif;
+      --brand: linear-gradient(120deg, var(--blue), var(--orange));
+      --shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.7);
+    }
     * { box-sizing: border-box; }
-    body { margin: 0; font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--bg); }
-    .hero { padding: 90px 24px; text-align: center; background: radial-gradient(1200px 500px at 50% -10%, #1a2338 0%, var(--bg) 60%); }
-    .hero h1 { font-size: 48px; margin: 0 0 14px; letter-spacing: -0.02em; color: #f4f6fb; }
-    .hero p { font-size: 18px; color: #9aa3b5; max-width: 560px; margin: 0 auto; }
-    .cta { margin-top: 28px; display: inline-flex; gap: 12px; }
-    .btn { padding: 12px 22px; border-radius: 10px; border: none; font-size: 15px; cursor: pointer; }
-    .btn.primary { background: var(--brand); color: #fff; }
-    .btn.ghost { background: #171a21; color: var(--ink); border: 1px solid #2c303a; }
-    .features { max-width: 980px; margin: 60px auto; padding: 0 24px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-    .card { background: #14171e; border: 1px solid #262b36; border-radius: 16px; padding: 24px; }
-    .card h3 { margin: 0 0 8px; font-size: 18px; color: #f4f6fb; }
-    .card p { margin: 0; color: #8b93a6; font-size: 14px; }
-    .card .ico { width: 42px; height: 42px; border-radius: 10px; background: linear-gradient(135deg, var(--brand), #4ade80); margin-bottom: 14px; }
-    .gallery { max-width: 980px; margin: 40px auto 90px; padding: 0 24px; display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
-    .tile { border-radius: 16px; min-height: 220px; background-size: cover; background-position: center; }
-    .tile.a { background: linear-gradient(135deg, #2b5876, #4e4376); }
-    .tile.b { background: linear-gradient(135deg, #f7971e, #ffd200); }
-    footer { text-align: center; padding: 40px; color: #6b7180; font-size: 13px; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0; background: var(--bg); color: var(--ink);
+      font-family: var(--body); font-size: 16px; line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      background-image:
+        radial-gradient(900px 520px at 82% -8%, rgba(88, 174, 255, 0.14), transparent 60%),
+        radial-gradient(720px 480px at 8% 8%, rgba(255, 136, 88, 0.10), transparent 55%);
+      background-attachment: fixed;
+    }
+    h1, h2, h3, .display { font-family: var(--display); letter-spacing: -0.02em; }
+    a { color: inherit; text-decoration: none; }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .grad-text { background: var(--brand); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .eyebrow {
+      display: inline-flex; align-items: center; gap: 8px; font-family: var(--display);
+      font-weight: 600; font-size: 13px; letter-spacing: 0.02em; color: var(--ink-2);
+      background: var(--surface); border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px;
+    }
+    .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 10px var(--green); }
+
+    /* buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 9px; font-family: var(--display); font-weight: 600;
+      font-size: 15px; padding: 12px 20px; border-radius: 12px; border: 1px solid transparent;
+      cursor: pointer; transition: transform .15s ease, box-shadow .2s ease, background .2s; white-space: nowrap;
+    }
+    .btn.primary { background: var(--brand); color: #0a0c10; box-shadow: 0 12px 30px -10px rgba(88, 174, 255, 0.6); }
+    .btn.primary:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -12px rgba(88, 174, 255, 0.7); }
+    .btn.ghost { background: var(--surface); color: var(--ink); border-color: var(--line-2); }
+    .btn.ghost:hover { background: var(--surface-2); transform: translateY(-2px); }
+
+    /* nav */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+      background: rgba(8, 9, 13, 0.7); border-bottom: 1px solid var(--line);
+    }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+    .brand { display: flex; align-items: center; gap: 11px; font-family: var(--display); font-weight: 700; font-size: 18px; }
+    .brand .mark { width: 30px; height: 30px; border-radius: 9px; background: var(--brand); position: relative; box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); }
+    .brand .mark::after { content: ""; position: absolute; inset: 8px; border-radius: 4px; border: 2px solid rgba(10,12,16,.85); }
+    .nav-links { display: flex; align-items: center; gap: 28px; }
+    .nav-links a { color: var(--ink-2); font-size: 14.5px; font-weight: 500; transition: color .15s; }
+    .nav-links a:hover { color: var(--ink); }
+    .nav-cta { display: flex; align-items: center; gap: 12px; }
+
+    /* hero */
+    .hero { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 48px; align-items: center; padding: 84px 0 64px; }
+    .hero h1 { font-size: 62px; line-height: 1.02; margin: 20px 0 0; font-weight: 700; }
+    .hero .lede { font-size: 19px; color: var(--ink-2); max-width: 30ch; margin: 22px 0 30px; }
+    .hero-cta { display: flex; gap: 14px; flex-wrap: wrap; }
+    .hero-note { margin-top: 18px; color: var(--muted); font-size: 13.5px; display: flex; align-items: center; gap: 8px; }
+    .kbd { font-family: var(--display); font-weight: 600; font-size: 12px; background: var(--surface); border: 1px solid var(--line-2); border-bottom-width: 2px; border-radius: 6px; padding: 2px 7px; color: var(--ink); }
+
+    .hero-visual { position: relative; }
+    .browser {
+      background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden;
+      box-shadow: var(--shadow); transform: perspective(1400px) rotateY(-9deg) rotateX(3deg); transition: transform .4s ease;
+    }
+    .hero-visual:hover .browser { transform: perspective(1400px) rotateY(-4deg) rotateX(1deg); }
+    .browser .bar { display: flex; align-items: center; gap: 7px; padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+    .browser .bar i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+    .browser .bar .url { margin-left: 12px; flex: 1; height: 22px; border-radius: 6px; background: #0a0c11; border: 1px solid var(--line); font-size: 11px; color: var(--muted); display: flex; align-items: center; padding: 0 10px; font-family: var(--display); }
+    .browser .shot { display: block; width: 100%; }
+    .panel-float {
+      position: absolute; right: -22px; bottom: -34px; width: 174px; border-radius: 16px; overflow: hidden;
+      border: 1px solid var(--line-2); box-shadow: var(--shadow); animation: float 6s ease-in-out infinite;
+    }
+    .panel-float img { display: block; width: 100%; }
+    @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-12px); } }
+    .glow { position: absolute; inset: -40px -20px; background: radial-gradient(circle at 70% 40%, rgba(88,174,255,.28), transparent 60%); filter: blur(30px); z-index: -1; }
+
+    /* section shell */
+    section { padding: 66px 0; }
+    .sec-head { max-width: 620px; margin-bottom: 40px; }
+    .sec-head .eyebrow { margin-bottom: 16px; }
+    .sec-head h2 { font-size: 40px; margin: 0 0 12px; font-weight: 700; }
+    .sec-head p { color: var(--ink-2); font-size: 17px; margin: 0; }
+
+    /* playground */
+    .play-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 18px; }
+    .cell { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 24px; position: relative; overflow: hidden; }
+    .cell .tag { position: absolute; top: 12px; right: 14px; font-family: var(--display); font-weight: 600; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    .col-7 { grid-column: span 7; } .col-5 { grid-column: span 5; }
+    .col-4 { grid-column: span 4; } .col-8 { grid-column: span 8; }
+    .col-6 { grid-column: span 6; } .col-3 { grid-column: span 3; }
+
+    .banner { min-height: 190px; border-radius: 16px; background: linear-gradient(120deg, #2b5876 0%, #4e4376 100%); display: flex; flex-direction: column; justify-content: flex-end; padding: 22px; }
+    .banner h3 { margin: 0; font-size: 24px; color: #fff; }
+    .banner p { margin: 4px 0 0; color: rgba(255,255,255,.72); font-size: 14px; }
+
+    .swatches { display: flex; gap: 12px; flex-wrap: wrap; }
+    .chip { width: 58px; height: 58px; border-radius: 14px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.12); }
+    .chip.a { background: linear-gradient(135deg, var(--blue), #6ee7ff); }
+    .chip.b { background: linear-gradient(135deg, var(--orange), var(--yellow)); }
+    .chip.c { background: linear-gradient(135deg, var(--violet), #ff6bd6); }
+    .chip.d { background: linear-gradient(135deg, var(--green), #7fffd4); }
+    .chip.e { background: conic-gradient(from 210deg, #ff8858, #b36bff, #58aeff, #33d69f, #ff8858); }
+
+    .btn-samples { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .s-btn { font-family: var(--display); font-weight: 600; font-size: 14px; padding: 11px 18px; border-radius: 10px; border: none; cursor: pointer; }
+    .s-btn.fill { background: var(--blue); color: #04121f; }
+    .s-btn.grad { background: var(--brand); color: #0a0c10; }
+    .s-btn.out { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
+    .s-btn.pill { background: var(--surface-2); color: var(--ink); border-radius: 999px; padding: 11px 22px; }
+
+    .price { border: 1px solid var(--line); border-radius: 16px; padding: 22px; background: var(--bg-2); }
+    .price .amt { font-family: var(--display); font-weight: 700; font-size: 40px; }
+    .price .amt span { font-size: 15px; color: var(--muted); font-weight: 500; }
+    .price ul { list-style: none; padding: 0; margin: 16px 0 0; }
+    .price li { color: var(--ink-2); font-size: 14px; padding: 6px 0; display: flex; gap: 9px; align-items: center; }
+    .price li::before { content: ""; width: 16px; height: 16px; border-radius: 50%; background: rgba(51,214,159,.18); box-shadow: inset 0 0 0 1.5px var(--green); flex: none; }
+
+    .specimen h3 { font-size: 44px; margin: 0; line-height: 1.05; }
+    .specimen .row { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+    .badge { font-family: var(--display); font-weight: 600; font-size: 12px; padding: 5px 11px; border-radius: 999px; }
+    .badge.b1 { background: rgba(88,174,255,.16); color: var(--blue); }
+    .badge.b2 { background: rgba(255,136,88,.16); color: var(--orange); }
+    .badge.b3 { background: rgba(179,107,255,.16); color: var(--violet); }
+
+    .field-demo { display: flex; flex-direction: column; gap: 12px; }
+    .inp { background: var(--bg-2); border: 1px solid var(--line-2); border-radius: 10px; padding: 12px 14px; color: var(--ink); font-family: var(--body); font-size: 14px; }
+    .inp::placeholder { color: var(--muted); }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; }
+    .toggle-row span { font-size: 14px; color: var(--ink-2); }
+    .toggle { width: 46px; height: 26px; border-radius: 999px; background: var(--brand); position: relative; }
+    .toggle::after { content: ""; position: absolute; top: 3px; right: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; }
+
+    .stat { text-align: left; }
+    .stat .n { font-family: var(--display); font-weight: 700; font-size: 42px; line-height: 1; }
+    .stat .l { color: var(--muted); font-size: 13px; margin-top: 6px; }
+
+    /* features */
+    .feat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; }
+    .feat { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 26px; transition: border-color .2s, transform .2s; }
+    .feat:hover { border-color: var(--line-2); transform: translateY(-3px); }
+    .feat .ico { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; margin-bottom: 16px; background: var(--surface-2); border: 1px solid var(--line); }
+    .feat .ico svg { width: 22px; height: 22px; }
+    .feat h3 { font-size: 19px; margin: 0 0 7px; }
+    .feat p { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+
+    /* steps */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; counter-reset: s; }
+    .step { padding: 24px; border-radius: 18px; border: 1px solid var(--line); background: linear-gradient(180deg, var(--surface), transparent); }
+    .step::before { counter-increment: s; content: "0" counter(s); font-family: var(--display); font-weight: 700; font-size: 30px; color: transparent; background: var(--brand); -webkit-background-clip: text; background-clip: text; display: block; margin-bottom: 10px; }
+    .step h3 { font-size: 18px; margin: 0 0 6px; }
+    .step p { margin: 0; color: var(--ink-2); font-size: 14px; }
+
+    /* cta band */
+    .cta-band { border: 1px solid var(--line); border-radius: 28px; padding: 54px; text-align: center; position: relative; overflow: hidden; background: var(--bg-2); }
+    .cta-band::before { content: ""; position: absolute; inset: 0; background: radial-gradient(700px 260px at 50% 0%, rgba(88,174,255,.18), transparent 60%); }
+    .cta-band > * { position: relative; }
+    .cta-band h2 { font-size: 42px; margin: 0 0 12px; }
+    .cta-band p { color: var(--ink-2); font-size: 17px; margin: 0 auto 26px; max-width: 46ch; }
+
+    footer { border-top: 1px solid var(--line); padding: 40px 0; margin-top: 40px; }
+    .foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13.5px; }
+    .foot a { color: var(--ink-2); }
+    .foot a:hover { color: var(--ink); }
+
+    /* dock hint */
+    .dock-hint {
+      position: fixed; left: 74px; top: 50%; transform: translateY(-50%); z-index: 90;
+      background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 10px 14px;
+      font-family: var(--display); font-weight: 600; font-size: 13px; color: var(--ink); box-shadow: var(--shadow);
+      display: flex; align-items: center; gap: 9px; animation: hintIn .5s .8s both, hintPulse 2.4s 1.4s ease-in-out infinite;
+    }
+    .dock-hint .arw { color: var(--blue); font-size: 16px; }
+    .dock-hint b { color: var(--blue); }
+    .dock-hint .close { margin-left: 4px; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; }
+    @keyframes hintIn { from { opacity: 0; transform: translateY(-50%) translateX(-8px); } to { opacity: 1; } }
+    @keyframes hintPulse { 0%,100% { box-shadow: var(--shadow); } 50% { box-shadow: 0 0 0 4px rgba(88,174,255,.12), var(--shadow); } }
+
+    @media (max-width: 900px) {
+      .hero { grid-template-columns: 1fr; padding: 56px 0 40px; }
+      .hero h1 { font-size: 44px; }
+      .hero-visual { display: none; }
+      .play-grid > .cell, .feat-grid, .steps { grid-column: span 12 !important; }
+      .col-7,.col-5,.col-4,.col-8,.col-6,.col-3 { grid-column: span 12; }
+      .feat-grid, .steps { grid-template-columns: 1fr; }
+      .nav-links { display: none; }
+      .sec-head h2, .cta-band h2 { font-size: 30px; }
+      .dock-hint { display: none; }
+    }
   </style>
 </head>
 <body>
-  <section class="hero">
-    <h1 id="headline">The visual CSS editor that runs anywhere.</h1>
-    <p class="lede">Hover to highlight, click to select, edit design properties live, and copy clean CSS. No library, no build step, no code changes.</p>
-    <div class="cta">
-      <button class="btn primary">Get started</button>
-      <button class="btn ghost">Read the docs</button>
+  <header>
+    <div class="wrap nav">
+      <a class="brand" href="#top"><span class="mark"></span> InspectCSS</a>
+      <nav class="nav-links">
+        <a href="#playground">Playground</a>
+        <a href="#features">Features</a>
+        <a href="#how">How it works</a>
+        <a href="https://github.com" target="_blank" rel="noopener">GitHub&nbsp;↗</a>
+      </nav>
+      <div class="nav-cta">
+        <a class="btn ghost" href="https://github.com" target="_blank" rel="noopener">Star</a>
+        <a class="btn primary" href="#playground">Try it now</a>
+      </div>
     </div>
-  </section>
+  </header>
 
-  <section class="features">
-    <div class="card">
-      <div class="ico"></div>
-      <h3>Inspect anything</h3>
-      <p>Point at any element on any page and see its box model, size and fonts instantly.</p>
+  <main id="top">
+    <div class="wrap">
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="eyebrow"><span class="dot"></span> Open-source · Runs on any page</span>
+          <h1>The visual CSS editor that lives <span class="grad-text">on the page.</span></h1>
+          <p class="lede">Hover to highlight, click to select, edit spacing, color, gradients and type live — then copy clean CSS or an AI prompt.</p>
+          <div class="hero-cta">
+            <a class="btn primary" href="#playground">Start editing this page</a>
+            <a class="btn ghost" href="#features">See what it does</a>
+          </div>
+          <div class="hero-note">No install, no build step — the toolbar is already running. Press <span class="kbd">Esc</span> to pause picking.</div>
+        </div>
+        <div class="hero-visual">
+          <div class="glow"></div>
+          <div class="browser">
+            <div class="bar">
+              <i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i>
+              <span class="url">yoursite.com — editing live</span>
+            </div>
+            <img class="shot" src="preview.png" alt="The InspectCSS panel editing an element" />
+          </div>
+        </div>
+      </section>
     </div>
-    <div class="card">
-      <div class="ico"></div>
-      <h3>Edit live</h3>
-      <p>Change spacing, color, radius and typography and watch the page update in real time.</p>
-    </div>
-    <div class="card">
-      <div class="ico"></div>
-      <h3>Copy the CSS</h3>
-      <p>Every change generates first-class CSS you can paste straight into your codebase.</p>
-    </div>
-  </section>
 
-  <section class="gallery">
-    <div class="tile a"></div>
-    <div class="tile b"></div>
-  </section>
+    <div class="wrap">
+      <section id="playground">
+        <div class="sec-head">
+          <span class="eyebrow"><span class="dot"></span> Live sandbox</span>
+          <h2>Try it on real components.</h2>
+          <p>Everything below is a normal DOM element. Point at any of it with the toolbar, tweak it, and watch the CSS update — gradients and images included.</p>
+        </div>
 
-  <footer>Open-source demo page — try the toolbar at the bottom of the screen.</footer>
+        <div class="play-grid">
+          <div class="cell col-7">
+            <span class="tag">Gradient banner</span>
+            <div class="banner">
+              <h3>Editable gradient</h3>
+              <p>This block is a <code>linear-gradient</code> — select it and change the angle or stops.</p>
+            </div>
+          </div>
+
+          <div class="cell col-5">
+            <span class="tag">Color · gradients</span>
+            <div class="swatches">
+              <div class="chip a"></div>
+              <div class="chip b"></div>
+              <div class="chip c"></div>
+              <div class="chip d"></div>
+              <div class="chip e"></div>
+            </div>
+            <p style="color:var(--ink-2); font-size:14px; margin:16px 0 0;">Solid, linear and even a conic gradient — all live-editable fills.</p>
+          </div>
+
+          <div class="cell col-4">
+            <span class="tag">Buttons</span>
+            <div class="btn-samples" style="margin-top:8px;">
+              <button class="s-btn fill">Primary</button>
+              <button class="s-btn grad">Gradient</button>
+              <button class="s-btn out">Outline</button>
+              <button class="s-btn pill">Pill</button>
+            </div>
+          </div>
+
+          <div class="cell col-4">
+            <span class="tag">Typography</span>
+            <div class="specimen">
+              <h3 class="grad-text">Ag</h3>
+              <div class="row">
+                <span class="badge b1">Weight</span>
+                <span class="badge b2">Tracking</span>
+                <span class="badge b3">Leading</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="cell col-4">
+            <span class="tag">Pricing</span>
+            <div class="price">
+              <div class="amt">$0<span> / forever</span></div>
+              <ul>
+                <li>Unlimited elements</li>
+                <li>Copy real CSS</li>
+                <li>AI prompt export</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="cell col-6">
+            <span class="tag">Form</span>
+            <div class="field-demo">
+              <input class="inp" placeholder="you@example.com" />
+              <div class="toggle-row"><span>Sync changes to clipboard</span><div class="toggle"></div></div>
+              <button class="s-btn grad" style="align-self:flex-start;">Subscribe</button>
+            </div>
+          </div>
+
+          <div class="cell col-6">
+            <span class="tag">Stats</span>
+            <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:16px;">
+              <div class="stat"><div class="n grad-text">0kb</div><div class="l">Runtime deps</div></div>
+              <div class="stat"><div class="n" style="color:var(--blue)">1</div><div class="l">Script tag</div></div>
+              <div class="stat"><div class="n" style="color:var(--orange)">∞</div><div class="l">Pages it runs on</div></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <div class="sec-head">
+          <span class="eyebrow"><span class="dot"></span> What's inside</span>
+          <h2>A real inspector, not a color picker.</h2>
+          <p>Everything you'd reach for in a design tool — mapped straight onto live CSS.</p>
+        </div>
+        <div class="feat-grid">
+          <div class="feat">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#58aeff" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18M9 3v18"/></svg></div>
+            <h3>Inspect the box model</h3>
+            <p>Hover anything to see its size, padding, margin and fonts. Walk up to the parent or down to a child in one click.</p>
+          </div>
+          <div class="feat">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#ff8858" stroke-width="1.8"><path d="M4 20l4-1 9-9-3-3-9 9-1 4z"/><path d="M13 5l3 3"/></svg></div>
+            <h3>Edit live, drag to scrub</h3>
+            <p>Every number is draggable. Change spacing, radius, rotation and type and the page responds instantly.</p>
+          </div>
+          <div class="feat">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#b36bff" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 15l5-5 4 4 3-3 6 6"/></svg></div>
+            <h3>Multi-layer fills &amp; gradients</h3>
+            <p>Stack solids, linear gradients and images like a design tool — and edit gradients that already exist on the page.</p>
+          </div>
+          <div class="feat">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="#33d69f" stroke-width="1.8"><path d="M8 4h9a3 3 0 013 3v11"/><rect x="4" y="8" width="12" height="12" rx="3"/></svg></div>
+            <h3>Copy CSS or an AI prompt</h3>
+            <p>Every change is logged. Export clean CSS to paste into your codebase, or a prompt that tells any AI exactly what to change.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="how">
+        <div class="sec-head">
+          <span class="eyebrow"><span class="dot"></span> Three steps</span>
+          <h2>From hover to shipped CSS.</h2>
+        </div>
+        <div class="steps">
+          <div class="step"><h3>Point &amp; pick</h3><p>Move over the page — elements light up with their dimensions. Click to open the property panel.</p></div>
+          <div class="step"><h3>Edit visually</h3><p>Adjust layout, spacing, color, gradients and type with fields that feel like a design tool.</p></div>
+          <div class="step"><h3>Copy &amp; ship</h3><p>Grab the generated CSS or an AI prompt and drop it straight into your project.</p></div>
+        </div>
+      </section>
+
+      <section>
+        <div class="cta-band">
+          <h2>Edit any website, right now.</h2>
+          <p>The toolbar is already on this page. Pick an element and start changing things — nothing to install.</p>
+          <a class="btn primary" href="#top">Pick an element ↖</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap foot">
+      <span>InspectCSS — free &amp; open-source. Built for people who'd rather see the change than guess it.</span>
+      <span><a href="https://github.com" target="_blank" rel="noopener">GitHub</a> · <a href="#top">Back to top</a></span>
+    </div>
+  </footer>
+
+  <div class="dock-hint" id="dockHint">
+    <span class="arw">◀</span> Your <b>toolbar</b> is right here — pick anything.
+    <span class="close" onclick="this.parentElement.remove()">✕</span>
+  </div>
 
   <!-- Load the editor. Run `npm run build` first to produce dist/inspect.js -->
   <script src="../dist/inspect.js"></script>
