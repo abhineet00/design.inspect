@@ -744,10 +744,278 @@ ${body}
     };
   }
 
+  // src/core/fills.js
+  var bank = /* @__PURE__ */ new WeakMap();
+  function getFills(el) {
+    if (!bank.has(el)) bank.set(el, derive(el));
+    return bank.get(el);
+  }
+  function derive(el) {
+    const cs = getComputedStyle(el);
+    const bg = cs.backgroundColor;
+    const layers = [];
+    if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
+      const { hex, alpha } = rgbToHex(bg);
+      layers.push({ type: "solid", color: hex, alpha: alpha == null ? 1 : alpha });
+    }
+    return layers;
+  }
+  function layerCss(L) {
+    var _a, _b;
+    if (L.type === "solid") {
+      const c = hexToRgba(L.color, (_a = L.alpha) != null ? _a : 1);
+      return `linear-gradient(${c}, ${c})`;
+    }
+    if (L.type === "linear") {
+      const stops = (L.stops || []).map((s) => {
+        var _a2;
+        return `${hexToRgba(s.color, (_a2 = s.alpha) != null ? _a2 : 1)} ${s.pos}%`;
+      }).join(", ");
+      return `linear-gradient(${(_b = L.angle) != null ? _b : 180}deg, ${stops})`;
+    }
+    if (L.type === "image") return `url("${L.url}")`;
+    return "none";
+  }
+  function compose(layers) {
+    if (!layers || !layers.length) {
+      return { "background-image": "none", "background-color": "rgba(0, 0, 0, 0)" };
+    }
+    const img = [], size = [], repeat = [], pos = [];
+    for (const L of layers) {
+      img.push(layerCss(L));
+      size.push(L.type === "image" ? L.fit || "cover" : "auto");
+      repeat.push("no-repeat");
+      pos.push("center");
+    }
+    return {
+      "background-image": img.join(", "),
+      "background-size": size.join(", "),
+      "background-repeat": repeat.join(", "),
+      "background-position": pos.join(", "),
+      "background-color": "rgba(0, 0, 0, 0)"
+    };
+  }
+  function layerLabel(L) {
+    if (L.type === "solid") return L.color.replace("#", "").toUpperCase();
+    if (L.type === "linear") return "Gradient";
+    if (L.type === "image") return "Image";
+    return "";
+  }
+  function defaultLayer(type) {
+    if (type === "linear") return { type: "linear", angle: 180, stops: [{ color: "#58AEFF", alpha: 1, pos: 0 }, { color: "#FF8858", alpha: 1, pos: 100 }] };
+    if (type === "image") return { type: "image", url: "", fit: "cover" };
+    return { type: "solid", color: "#FFFFFF", alpha: 1 };
+  }
+
   // src/icons/index.js
   var icons = { "align-bottom": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="align-bottom">\n<path id="Vector" d="M11.0013 6.6682C11.5638 6.6682 12.2132 6.61263 12.534 7.1682C12.668 7.40027 12.668 7.7118 12.668 8.33487V9.00153C12.668 9.6246 12.668 9.93613 12.534 10.1682C12.2132 10.7238 11.5638 10.6682 11.0013 10.6682C10.4387 10.6682 9.78937 10.7238 9.46857 10.1682C9.33464 9.93613 9.33464 9.6246 9.33464 9.00153V8.33487C9.33464 7.7118 9.33464 7.40027 9.46857 7.1682C9.78937 6.61263 10.4387 6.6682 11.0013 6.6682Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M5.0013 2.66821C5.5639 2.66821 6.21323 2.61263 6.534 3.16821C6.668 3.40026 6.668 3.7118 6.668 4.33488V9.00153C6.668 9.6246 6.668 9.93613 6.534 10.1682C6.21323 10.7238 5.5639 10.6682 5.0013 10.6682C4.43871 10.6682 3.78938 10.7238 3.46862 10.1682C3.33464 9.93613 3.33464 9.6246 3.33464 9.00153V4.33488C3.33464 3.7118 3.33464 3.40026 3.46862 3.16821C3.78938 2.61263 4.43871 2.66821 5.0013 2.66821Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M14.6667 13.3333H1.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "align-horizontal-center": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="align-horizontal-center">\n<path id="Vector" d="M8 12.6667V14.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M8 6.66667V9.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M8 1.33333V3.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M5.33358 5C5.33358 4.43741 5.278 3.78807 5.83358 3.46731C6.06563 3.33333 6.37717 3.33333 7.00027 3.33333H9.00027C9.62334 3.33333 9.93487 3.33333 10.1669 3.46731C10.7225 3.78807 10.6669 4.43741 10.6669 5C10.6669 5.56259 10.7225 6.21193 10.1669 6.53269C9.93487 6.66667 9.62334 6.66667 9.00027 6.66667H7.00027C6.37717 6.66667 6.06563 6.66667 5.83358 6.53269C5.278 6.21193 5.33358 5.56259 5.33358 5Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_5" d="M2.66691 11C2.66691 10.4374 2.61133 9.78807 3.16691 9.46733C3.39896 9.33333 3.7105 9.33333 4.33358 9.33333H11.6669C12.29 9.33333 12.6015 9.33333 12.8336 9.46733C13.3891 9.78807 13.3336 10.4374 13.3336 11C13.3336 11.5626 13.3891 12.2119 12.8336 12.5327C12.6015 12.6667 12.29 12.6667 11.6669 12.6667H4.33358C3.7105 12.6667 3.39896 12.6667 3.16691 12.5327C2.61133 12.2119 2.66691 11.5626 2.66691 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "align-left": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="align-left">\n<path id="Vector" d="M5.33488 5C5.33488 4.43741 5.2793 3.78807 5.83488 3.46731C6.06693 3.33333 6.37847 3.33333 7.00153 3.33333H7.6682C8.29127 3.33333 8.6028 3.33333 8.83487 3.46731C9.39047 3.78807 9.33487 4.43741 9.33487 5C9.33487 5.56259 9.39047 6.21193 8.83487 6.53269C8.6028 6.66667 8.29127 6.66667 7.6682 6.66667H7.00153C6.37847 6.66667 6.06693 6.66667 5.83488 6.53269C5.2793 6.21193 5.33488 5.56259 5.33488 5Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M5.33488 11C5.33488 10.4374 5.2793 9.78807 5.83488 9.46733C6.06693 9.33333 6.37847 9.33333 7.00153 9.33333H11.6682C12.2913 9.33333 12.6028 9.33333 12.8349 9.46733C13.3905 9.78807 13.3349 10.4374 13.3349 11C13.3349 11.5626 13.3905 12.2119 12.8349 12.5327C12.6028 12.6667 12.2913 12.6667 11.6682 12.6667H7.00153C6.37847 12.6667 6.06693 12.6667 5.83488 12.5327C5.2793 12.2119 5.33488 11.5626 5.33488 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M2.66667 1.33333V14.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "align-right": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="align-right">\n<path id="Vector" d="M6.66691 5C6.66691 4.43741 6.6113 3.78807 7.16691 3.46731C7.39891 3.33333 7.71044 3.33333 8.33358 3.33333H9.00024C9.62331 3.33333 9.93485 3.33333 10.1669 3.46731C10.7224 3.78807 10.6669 4.43741 10.6669 5C10.6669 5.56259 10.7224 6.21193 10.1669 6.53269C9.93485 6.66667 9.62331 6.66667 9.00024 6.66667H8.33358C7.71044 6.66667 7.39891 6.66667 7.16691 6.53269C6.6113 6.21193 6.66691 5.56259 6.66691 5Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M2.66691 11C2.66691 10.4374 2.61133 9.78807 3.16691 9.46733C3.39896 9.33333 3.7105 9.33333 4.33358 9.33333H9.00027C9.62334 9.33333 9.93487 9.33333 10.1669 9.46733C10.7225 9.78807 10.6669 10.4374 10.6669 11C10.6669 11.5626 10.7225 12.2119 10.1669 12.5327C9.93487 12.6667 9.62334 12.6667 9.00027 12.6667H4.33358C3.7105 12.6667 3.39896 12.6667 3.16691 12.5327C2.61133 12.2119 2.66691 11.5626 2.66691 11Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M13.3333 1.33333V14.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "align-top": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="align-top">\n<path id="Vector" d="M11.0013 5.33325C11.5638 5.33325 12.2132 5.27766 12.534 5.83325C12.668 6.0653 12.668 6.37684 12.668 6.99993V7.6666C12.668 8.28966 12.668 8.6012 12.534 8.83326C12.2132 9.3888 11.5638 9.33326 11.0013 9.33326C10.4387 9.33326 9.78937 9.3888 9.46857 8.83326C9.33464 8.6012 9.33464 8.28966 9.33464 7.6666V6.99993C9.33464 6.37684 9.33464 6.0653 9.46857 5.83325C9.78937 5.27766 10.4387 5.33325 11.0013 5.33325Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M5.0013 5.33325C5.5639 5.33325 6.21323 5.27766 6.534 5.83325C6.668 6.0653 6.668 6.37684 6.668 6.99993V11.6666C6.668 12.2897 6.668 12.6012 6.534 12.8333C6.21323 13.3888 5.5639 13.3333 5.0013 13.3333C4.43871 13.3333 3.78938 13.3888 3.46862 12.8333C3.33464 12.6012 3.33464 12.2897 3.33464 11.6666V6.99993C3.33464 6.37684 3.33464 6.0653 3.46862 5.83325C3.78938 5.27766 4.43871 5.33325 5.0013 5.33325Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M14.6667 2.66667H1.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "align-vertical-center": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="align-vertical-center">\n<path id="Vector" d="M11 5.33488C11.5626 5.33488 12.2119 5.2793 12.5327 5.83488C12.6667 6.06693 12.6667 6.37847 12.6667 7.00153V9.00153C12.6667 9.6246 12.6667 9.93613 12.5327 10.1682C12.2119 10.7238 11.5626 10.6682 11 10.6682C10.4374 10.6682 9.78807 10.7238 9.46733 10.1682C9.33333 9.93613 9.33333 9.6246 9.33333 9.00153V7.00153C9.33333 6.37847 9.33333 6.06693 9.46733 5.83488C9.78807 5.2793 10.4374 5.33488 11 5.33488Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M5 2.66821C5.56259 2.66821 6.21193 2.61263 6.53269 3.16821C6.66667 3.40026 6.66667 3.7118 6.66667 4.33488V11.6682C6.66667 12.2913 6.66667 12.6028 6.53269 12.8349C6.21193 13.3905 5.56259 13.3349 5 13.3349C4.43741 13.3349 3.78807 13.3905 3.46731 12.8349C3.33333 12.6028 3.33333 12.2913 3.33333 11.6682V4.33488C3.33333 3.7118 3.33333 3.40026 3.46731 3.16821C3.78807 2.61263 4.43741 2.66821 5 2.66821Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M3.33333 8H1.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M9.33333 8H6.66667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_5" d="M14.6667 8H12.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "cancel-01": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="cancel-01">\n<path id="Vector" d="M18 6L6.00081 17.9992M17.9992 18L6 6.00085" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "chevron-down": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="chevron-down">\n<path id="Vector" d="M12 6.00003C12 6.00003 9.05407 10 8 10C6.94587 10 4 6 4 6" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "component": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="component">\n<path id="Vector" d="M9.19671 6.83999C9.33456 7.11818 9.59244 7.37605 10.1082 7.89181C10.6239 8.40756 10.8818 8.66544 11.16 8.80329C11.6893 9.06557 12.3107 9.06557 12.84 8.80329C13.1182 8.66544 13.3761 8.40756 13.8918 7.89181C14.4076 7.37605 14.6654 7.11818 14.8033 6.83999C15.0656 6.31071 15.0656 5.68929 14.8033 5.16001C14.6654 4.88182 14.4076 4.62395 13.8918 4.10819C13.3761 3.59244 13.1182 3.33456 12.84 3.19671C12.3107 2.93443 11.6893 2.93443 11.16 3.19671C10.8818 3.33456 10.6239 3.59244 10.1082 4.10819C9.59244 4.62395 9.33456 4.88182 9.19671 5.16001C8.93443 5.68929 8.93443 6.31071 9.19671 6.83999Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>\n<path id="Vector_2" d="M3.19671 12.84C3.33456 13.1182 3.59244 13.3761 4.10819 13.8918C4.62395 14.4076 4.88182 14.6654 5.16001 14.8033C5.68929 15.0656 6.31071 15.0656 6.83999 14.8033C7.11818 14.6654 7.37605 14.4076 7.89181 13.8918C8.40756 13.3761 8.66544 13.1182 8.80329 12.84C9.06557 12.3107 9.06557 11.6893 8.80329 11.16C8.66544 10.8818 8.40756 10.6239 7.89181 10.1082C7.37605 9.59244 7.11818 9.33456 6.83999 9.19671C6.31071 8.93443 5.68929 8.93443 5.16001 9.19671C4.88182 9.33456 4.62395 9.59244 4.10819 10.1082C3.59244 10.6239 3.33456 10.8818 3.19671 11.16C2.93443 11.6893 2.93443 12.3107 3.19671 12.84Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>\n<path id="Vector_3" d="M15.1967 12.84C15.3346 13.1182 15.5924 13.3761 16.1082 13.8918C16.6239 14.4076 16.8818 14.6654 17.16 14.8033C17.6893 15.0656 18.3107 15.0656 18.84 14.8033C19.1182 14.6654 19.3761 14.4076 19.8918 13.8918C20.4076 13.3761 20.6654 13.1182 20.8033 12.84C21.0656 12.3107 21.0656 11.6893 20.8033 11.16C20.6654 10.8818 20.4076 10.6239 19.8918 10.1082C19.3761 9.59244 19.1182 9.33456 18.84 9.19671C18.3107 8.93443 17.6893 8.93443 17.16 9.19671C16.8818 9.33456 16.6239 9.59244 16.1082 10.1082C15.5924 10.6239 15.3346 10.8818 15.1967 11.16C14.9344 11.6893 14.9344 12.3107 15.1967 12.84Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>\n<path id="Vector_4" d="M9.19671 18.84C9.33456 19.1182 9.59244 19.3761 10.1082 19.8918C10.6239 20.4076 10.8818 20.6654 11.16 20.8033C11.6893 21.0656 12.3107 21.0656 12.84 20.8033C13.1182 20.6654 13.3761 20.4076 13.8918 19.8918C14.4076 19.3761 14.6654 19.1182 14.8033 18.84C15.0656 18.3107 15.0656 17.6893 14.8033 17.16C14.6654 16.8818 14.4076 16.6239 13.8918 16.1082C13.3761 15.5924 13.1182 15.3346 12.84 15.1967C12.3107 14.9344 11.6893 14.9344 11.16 15.1967C10.8818 15.3346 10.6239 15.5924 10.1082 16.1082C9.59244 16.6239 9.33456 16.8818 9.19671 17.16C8.93443 17.6893 8.93443 18.3107 9.19671 18.84Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>\n</g>\n</svg>', "delete02": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="delete-02">\n<path id="Vector" d="M13 3.66667L12.5869 10.3501C12.4813 12.0576 12.4285 12.9114 12.0005 13.5253C11.7889 13.8287 11.5165 14.0849 11.2005 14.2773C10.5614 14.6667 9.706 14.6667 7.99513 14.6667C6.28208 14.6667 5.42553 14.6667 4.78603 14.2766C4.46987 14.0838 4.19733 13.8272 3.98579 13.5232C3.55792 12.9084 3.5063 12.0534 3.40307 10.3435L3 3.66667" stroke="currentColor" stroke-linecap="round"/>\n<path id="Vector_2" d="M2 3.66667H14M10.7038 3.66667L10.2487 2.72782C9.9464 2.10417 9.7952 1.79235 9.53447 1.59787C9.47667 1.55473 9.4154 1.51636 9.35133 1.48313C9.0626 1.33333 8.71607 1.33333 8.023 1.33333C7.31253 1.33333 6.95733 1.33333 6.66379 1.48941C6.59873 1.52401 6.53665 1.56393 6.47819 1.60878C6.21443 1.81113 6.06709 2.13437 5.77241 2.78084L5.36861 3.66667" stroke="currentColor" stroke-linecap="round"/>\n<path id="Vector_3" d="M6.33333 11V7" stroke="currentColor" stroke-linecap="round"/>\n<path id="Vector_4" d="M9.66667 11V7" stroke="currentColor" stroke-linecap="round"/>\n</g>\n</svg>', "expand-paragraph": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="expand-paragraph">\n<path id="Vector" d="M5.33333 4.66665C5.33333 4.66665 3.86035 2.66667 3.33332 2.66667C2.80628 2.66666 1.33333 4.66667 1.33333 4.66667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M8 8H14.6667M8 5.33333H14.6667M8 10.6667H11.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M1.33333 11.3333C1.33333 11.3333 2.80631 13.3333 3.33335 13.3333C3.86039 13.3333 5.33333 11.3333 5.33333 11.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M3.33333 3.33333V12.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "file-diff": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="file-diff">\n<path id="Vector" d="M5.9925 12V18M9 14.9925H3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M3 22H9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M13 22C16.7712 22 18.6569 22 19.8284 20.8284C21 19.6569 21 17.7712 21 14V10.6569C21 9.83935 21 9.4306 20.8478 9.06306C20.6955 8.69552 20.4065 8.40649 19.8284 7.82843L15.0919 3.09188C14.593 2.593 14.3436 2.34355 14.0345 2.19575C13.9702 2.165 13.9044 2.13772 13.8372 2.11401C13.5141 2 13.1614 2 12.4558 2C9.21082 2 7.58831 2 6.48933 2.88607C6.26732 3.06508 6.06508 3.26731 5.88608 3.48933C5.14374 4.41003 5.02332 5.69818 5.00378 8M14 2.5V3C14 5.82843 14 7.24264 14.8787 8.12132C15.7574 9 17.1716 9 20 9H20.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "full-screen": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="full-screen">\n<path id="Vector" d="M10.3334 14C11.2638 14 11.7289 14 12.1074 13.8852C12.9597 13.6267 13.6267 12.9597 13.8852 12.1074C14 11.7289 14 11.2637 14 10.3333M14 5.66667C14 4.73629 14 4.27111 13.8852 3.89257C13.6267 3.04031 12.9597 2.37336 12.1074 2.11483C11.7289 2 11.2638 2 10.3334 2M5.66671 14C4.73633 14 4.27115 14 3.89261 13.8852C3.04035 13.6267 2.3734 12.9597 2.11487 12.1074C2.00004 11.7289 2.00004 11.2637 2.00004 10.3333M2.00004 5.66667C2.00004 4.73629 2.00004 4.27111 2.11487 3.89257C2.3734 3.04031 3.04035 2.37336 3.89261 2.11483C4.27115 2 4.73633 2 5.66671 2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "horizontal-resize": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="horizontal-resize">\n<path id="Vector" d="M6.66667 13.3333V2.66667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M9.33333 13.3333V2.66667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M6.66667 8H4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M1.33345 8.0336C1.31307 7.34313 4.00563 5.71958 4.25924 6.04183C4.54682 6.40726 3.85924 7.49313 3.70438 7.83893C3.61124 8.04687 3.61379 8.13707 3.71969 8.3448C4.19783 9.28273 4.4369 9.75167 4.29063 9.955L4.28932 9.9568C4.05365 10.2798 1.35334 8.7074 1.33345 8.0336Z" stroke="currentColor"/>\n<path id="Vector_5" d="M14.6666 7.9664C14.687 8.65687 11.9944 10.2804 11.7408 9.9582C11.4532 9.59273 12.1408 8.5068 12.2956 8.16107C12.3888 7.95313 12.3862 7.86293 12.2804 7.6552C11.8022 6.71727 11.5631 6.24834 11.7094 6.04501L11.7107 6.04319C11.9464 5.72023 14.6467 7.2926 14.6666 7.9664Z" stroke="currentColor"/>\n<path id="Vector_6" d="M12 8H9.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "html-file-01": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="html-file-01">\n<path id="Vector" d="M19.5 14V10.6569C19.5 9.83935 19.5 9.4306 19.3478 9.06306C19.1955 8.69552 18.9065 8.40649 18.3284 7.82843L13.5919 3.09188C13.093 2.593 12.8436 2.34355 12.5345 2.19575C12.4702 2.165 12.4044 2.13772 12.3372 2.11401C12.0141 2 11.6614 2 10.9558 2C7.71082 2 6.08831 2 4.98933 2.88607C4.76731 3.06508 4.56508 3.26731 4.38607 3.48933C3.5 4.58831 3.5 6.21082 3.5 9.45584V14M12.5 2.5V3C12.5 5.82843 12.5 7.24264 13.3787 8.12132C14.2574 9 15.6716 9 18.5 9H19" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M5.5 17V19.5M5.5 19.5V22M5.5 19.5H2.5M2.5 19.5V17M2.5 19.5V22M9 17V22M9 17H7.5M9 17H10.5M12.5 22V17L14.5 19.5L16.5 17V22M19 17V22H21.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "image-flip-horizontal": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="image-flip -horizontal">\n<path id="Vector" d="M3.60595 7.02987L2.22329 9.64513C1.51345 10.9877 1.15854 11.6591 1.42115 12.1635C1.68375 12.668 2.38814 12.668 3.79691 12.668H5.17957C6.03836 12.668 6.46775 12.668 6.73457 12.3736C7.00137 12.0793 7.00137 11.6055 7.00137 10.6579V8.04267C7.00137 5.05139 7.00137 3.55575 6.32818 3.35495C5.65501 3.15416 4.97199 4.44606 3.60595 7.02987Z" stroke="currentColor" stroke-linejoin="round"/>\n<path id="Vector_2" d="M12.3954 7.02987L13.7781 9.64513C14.4879 10.9877 14.8428 11.6591 14.5802 12.1635C14.3176 12.668 13.6132 12.668 12.2045 12.668H10.8218C9.96304 12.668 9.53364 12.668 9.26684 12.3736C9.00004 12.0793 9.00004 11.6055 9.00004 10.6579V8.04267C9.00004 5.05139 9.00004 3.55575 9.67317 3.35495C10.3464 3.15416 11.0294 4.44606 12.3954 7.02987Z" stroke="currentColor" stroke-linejoin="round"/>\n</g>\n</svg>', "image-flip-vertical": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="image-flip-vertical">\n<path id="Vector" d="M8.97151 3.60461L6.35624 2.22195C5.01361 1.51211 4.3423 1.15719 3.83783 1.41981C3.33337 1.68241 3.33337 2.38679 3.33337 3.79556V5.17823C3.33337 6.03702 3.33337 6.46641 3.62774 6.7332C3.92211 7 4.39588 7 5.34343 7H7.95864C10.95 7 12.4456 7 12.6464 6.32683C12.8472 5.65367 11.5553 4.97065 8.97151 3.60461Z" stroke="currentColor" stroke-linejoin="round"/>\n<path id="Vector_2" d="M8.97151 12.3954L6.35624 13.7781C5.01361 14.4879 4.3423 14.8428 3.83783 14.5802C3.33337 14.3176 3.33337 13.6132 3.33337 12.2045V10.8218C3.33337 9.963 3.33337 9.5336 3.62774 9.2668C3.92211 9 4.39588 9 5.34343 9H7.95864C10.95 9 12.4456 9 12.6464 9.67313C12.8472 10.3463 11.5553 11.0293 8.97151 12.3954Z" stroke="currentColor" stroke-linejoin="round"/>\n</g>\n</svg>', "laptop-phone-sync": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="laptop-phone-sync">\n<path id="Vector" d="M15.9999 13.5001V17.5001C15.9999 18.9143 15.9999 19.6214 16.4392 20.0608C16.8786 20.5001 17.5857 20.5001 18.9999 20.5001C20.4141 20.5001 21.1212 20.5001 21.5605 20.0608C21.9999 19.6214 21.9999 18.9143 21.9999 17.5001V13.5001C21.9999 12.0859 21.9999 11.3788 21.5605 10.9395C21.1212 10.5001 20.4141 10.5001 18.9999 10.5001C17.5857 10.5001 16.8786 10.5001 16.4392 10.9395C15.9999 11.3788 15.9999 12.0859 15.9999 13.5001Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M3.99988 16.5005V8.50049C3.99988 6.14347 3.99988 4.96495 4.73254 4.23272C5.46521 3.50049 6.64442 3.50049 9.00283 3.50049H16.007C18.3654 3.50049 19.5446 3.50049 20.2773 4.23272C20.8346 4.78969 20.9679 5.60486 20.9999 7.00049" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M12.9999 20.5005H2.51567C2.13273 20.5005 1.88367 20.1093 2.05493 19.7769L3.99988 16.5005H12.9999" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "layer-bring-forward": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="layer-bring-forward">\n<path id="Vector" d="M15.8899 11.5L19.2873 13.0606C21.0958 13.8914 22 14.3067 22 15C22 15.6933 21.0958 16.1086 19.2873 16.9394L14.3943 19.187C13.2144 19.729 12.6245 20 12 20C11.3755 20 10.7856 19.729 9.60573 19.187L4.7127 16.9394C2.90423 16.1086 2 15.6933 2 15C2 14.3067 2.90423 13.8914 4.7127 13.0606L8.11012 11.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M12 4.5V15M15 7C14.4102 6.39316 12.8403 4 12 4C11.1597 4 9.58984 6.39316 9 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "layer-send-backward": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="layer-send-backward">\n<path id="Vector" d="M15.8899 12.5L19.2873 10.9394C21.0958 10.1086 22 9.69326 22 9C22 8.30674 21.0958 7.89137 19.2873 7.06064L14.3943 4.81298C13.2144 4.27099 12.6245 4 12 4C11.3755 4 10.7856 4.27099 9.60573 4.81298L4.7127 7.06064C2.90423 7.89137 2 8.30674 2 9C2 9.69326 2.90423 10.1086 4.7127 10.9394L8.11012 12.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M12 19.5V9M15 17C14.4102 17.6068 12.8403 20 12 20C11.1597 20 9.58984 17.6068 9 17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "letter-spacing": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="letter-spacing">\n<path id="Vector" d="M1.33333 14.6667V1.33333" stroke="currentColor" stroke-linecap="round"/>\n<path id="Vector_2" d="M14.6667 14.6667V1.33333" stroke="currentColor" stroke-linecap="round"/>\n<path id="Vector_3" d="M4.66667 12L7.10227 4.9909C7.29647 4.54186 7.65853 3.99771 7.96447 4.00001C8.41753 4.00341 8.65513 4.47172 8.91827 4.9909C9.1814 5.51009 11.3333 12 11.3333 12M6.00875 8.6608L9.92967 8.61953" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "line2": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 286 1" fill="none" xmlns="http://www.w3.org/2000/svg">\n<line id="Line 2" y1="0.5" x2="286" y2="0.5" stroke="#232323"/>\n</svg>', "minimize-screen": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="minimize-screen">\n<path id="Vector" d="M7.6222 10.7106L5.79413 10.6439C5.52243 10.634 5.30729 10.4109 5.30729 10.1389V8.39575M8.97393 7.04395L5.61144 10.3895" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M14.6667 4.66667C14.6667 5.92373 14.6667 6.55227 14.2761 6.9428C13.8856 7.33333 13.2571 7.33333 12 7.33333H11.3333C10.0763 7.33333 9.44773 7.33333 9.0572 6.9428C8.66667 6.55227 8.66667 5.92373 8.66667 4.66667V4C8.66667 2.74293 8.66667 2.1144 9.0572 1.72387C9.44773 1.33333 10.0763 1.33333 11.3333 1.33333H12C13.2571 1.33333 13.8856 1.33333 14.2761 1.72387C14.6667 2.1144 14.6667 2.74293 14.6667 4V4.66667Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M14.6667 10.3333V9M6.66667 14.6667H9.33333M1.33333 6.66667V9.33333M7 1.33333H5.66667M14.6267 12.3333C14.5241 13.0437 14.3243 13.5473 13.9358 13.9359C13.5473 14.3243 13.0437 14.5241 12.3333 14.6267M3.66667 14.6267C2.95627 14.5241 2.45267 14.3243 2.0642 13.9358C1.67567 13.5473 1.47593 13.0437 1.37327 12.3333M1.37327 3.66667C1.47593 2.95627 1.67567 2.45267 2.0642 2.0642C2.45267 1.67567 2.95627 1.47593 3.66667 1.37327" stroke="currentColor" stroke-linecap="round"/>\n</g>\n</svg>', "paragraph-spacing": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="paragraph-spacing">\n<path id="Vector" d="M2 1.33333H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M2 14.6667H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M6.3151 5.67251L7.5158 4.24963C7.7616 3.95528 8.1784 3.95274 8.4488 4.24963L9.63526 5.67251M7.98226 4.72295V7.60526L7.98126 11.3329M9.64846 10.3833L8.44773 11.8062C8.20193 12.1005 7.78513 12.1031 7.51473 11.8062L6.32826 10.3833" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "pause": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="pause">\n<path id="Vector" d="M4 7C4 5.58579 4 4.87868 4.43934 4.43934C4.87868 4 5.58579 4 7 4C8.41421 4 9.12132 4 9.56066 4.43934C10 4.87868 10 5.58579 10 7V17C10 18.4142 10 19.1213 9.56066 19.5607C9.12132 20 8.41421 20 7 20C5.58579 20 4.87868 20 4.43934 19.5607C4 19.1213 4 18.4142 4 17V7Z" stroke="currentColor" stroke-width="1.5"/>\n<path id="Vector_2" d="M14 7C14 5.58579 14 4.87868 14.4393 4.43934C14.8787 4 15.5858 4 17 4C18.4142 4 19.1213 4 19.5607 4.43934C20 4.87868 20 5.58579 20 7V17C20 18.4142 20 19.1213 19.5607 19.5607C19.1213 20 18.4142 20 17 20C15.5858 20 14.8787 20 14.4393 19.5607C14 19.1213 14 18.4142 14 17V7Z" stroke="currentColor" stroke-width="1.5"/>\n</g>\n</svg>', "plus": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="plus">\n<path id="Vector" d="M7.99478 2.66675V13.3334M13.3281 8.00007H2.66146" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "redo-01": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="redo-01">\n<path id="Vector" d="M20.9922 8H8.99219C5.67848 8 2.99219 10.6863 2.99219 14C2.99219 17.3137 5.67848 20 8.99219 20H12.9922" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M16.9922 4L18.146 4.87652C20.0435 6.31801 20.9922 7.03875 20.9922 8C20.9922 8.96125 20.0435 9.68199 18.146 11.1235L16.9922 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "rotate01": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="rotate-01">\n<path id="Vector" d="M13.3394 1.33333V3.42146C13.3394 3.61737 13.0945 3.70605 12.9691 3.55555C11.7484 2.19167 9.97443 1.33333 7.99996 1.33333C4.31806 1.33333 1.33329 4.3181 1.33329 8C1.33329 11.6819 4.31806 14.6667 7.99996 14.6667C11.6818 14.6667 14.6666 11.6819 14.6666 8" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "text-align-center": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="text-align-center">\n<path id="Vector" d="M2 2H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M5.33333 6H10.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M2 10H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M5.33333 14H10.6667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "text-align-justify": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="text-align-justify">\n<path id="Vector" d="M2 2H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M2 6H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M2 10H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M2 14H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "text-align-right": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="text-align-right">\n<path id="Vector" d="M2 2H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M8.66667 6H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M2 10H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M8.66667 14H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "text-align-start": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="text-align-start">\n<path id="Vector" d="M2 2H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M2 6H7.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M2 10H14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M2 14H7.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "transparency": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="transparency">\n<path id="Vector" d="M10.6667 6C10.6667 8.57733 8.57733 10.6667 6 10.6667C3.42267 10.6667 1.33333 8.57733 1.33333 6C1.33333 3.42267 3.42267 1.33333 6 1.33333C8.57733 1.33333 10.6667 3.42267 10.6667 6Z" stroke="currentColor"/>\n<path id="Vector_2" d="M5.35062 10.4045C5.33917 10.2711 5.33333 10.1363 5.33333 10C5.33333 7.42267 7.42267 5.33333 10 5.33333C10.1911 5.33333 10.3795 5.34482 10.5646 5.36714M12.6646 6.16834C13.8747 7.01147 14.6667 8.41327 14.6667 10C14.6667 12.5773 12.5773 14.6667 10 14.6667C8.41327 14.6667 7.01147 13.8747 6.16834 12.6646" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M4.33333 1.66667L10.3333 7.66667M1.66667 4.33333L7.66667 10.3333" stroke="currentColor"/>\n</g>\n</svg>', "undo-03": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="undo-03">\n<path id="Vector" d="M3 8H15C18.3137 8 21 10.6863 21 14C21 17.3137 18.3137 20 15 20H11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M7 4L5.8462 4.87652C3.94873 6.31801 3 7.03875 3 8C3 8.96125 3.94873 9.68199 5.8462 11.1235L7 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "vector": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="9.00007" height="5.00003" viewBox="0 0 9.00007 5.00003" fill="none" xmlns="http://www.w3.org/2000/svg">\n<path id="Vector" d="M8.50003 0.500066C8.50003 0.500066 5.5541 4.50003 4.50003 4.50003C3.4459 4.50003 0.500033 0.500033 0.500033 0.500033" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</svg>', "vertical-resize": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="vertical-resize">\n<path id="Vector" d="M2.66667 6.66667H13.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_2" d="M2.66667 9.33333H13.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_3" d="M8 6.66667V4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n<path id="Vector_4" d="M7.9664 1.33345C8.65687 1.31307 10.2804 4.00563 9.9582 4.25924C9.59273 4.54682 8.5068 3.85924 8.16107 3.70438C7.95313 3.61124 7.86293 3.61379 7.6552 3.71969C6.71727 4.19783 6.24834 4.4369 6.04501 4.29063L6.04319 4.28932C5.72023 4.05365 7.2926 1.35334 7.9664 1.33345Z" stroke="currentColor"/>\n<path id="Vector_5" d="M8.0336 14.6665C7.34313 14.6869 5.71958 11.9944 6.04183 11.7408C6.40726 11.4532 7.49313 12.1407 7.83893 12.2956C8.04687 12.3887 8.13707 12.3862 8.3448 12.2803C9.28273 11.8022 9.75167 11.5631 9.955 11.7093L9.9568 11.7107C10.2798 11.9463 8.7074 14.6467 8.0336 14.6665Z" stroke="currentColor"/>\n<path id="Vector_6" d="M8 12V9.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "x": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">\n<g id="x">\n<path id="Vector" d="M12 4L8 8M8 8L4 12M8 8L12 12M8 8L4 4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/>\n</g>\n</svg>', "sidebar-right-01": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="sidebar-right-01"><path id="Vector" d="M14.6665 8C14.6665 5.50018 14.6665 4.25027 14.0299 3.37405C13.8243 3.09107 13.5755 2.84221 13.2925 2.63661C12.4163 2 11.1663 2 8.66654 2H7.3332C4.83338 2 3.58347 2 2.70725 2.63661C2.42427 2.84221 2.17541 3.09107 1.96981 3.37405C1.3332 4.25027 1.3332 5.50018 1.3332 8C1.3332 10.4998 1.3332 11.7497 1.96981 12.6259C2.17541 12.9089 2.42427 13.1578 2.70725 13.3634C3.58347 14 4.83338 14 7.3332 14H8.66654C11.1663 14 12.4163 14 13.2925 13.3634C13.5755 13.1578 13.8243 12.9089 14.0299 12.6259C14.6665 11.7497 14.6665 10.4998 14.6665 8Z" stroke="currentColor" stroke-linejoin="round"/><path id="Vector_2" d="M9.6668 2.33334V13.6667" stroke="currentColor" stroke-linejoin="round"/><path id="Vector_3" d="M12.6668 4.66666H11.6668" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_4" d="M12.6668 7.33334H11.6668" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_5" d="M5.3332 6.66666L6.1509 7.37146C6.49466 7.66773 6.66654 7.81593 6.66654 8C6.66654 8.18406 6.49466 8.33226 6.1509 8.62853L5.3332 9.33333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "minus-sign": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="minus-sign"><path id="Vector" d="M13.3333 8H2.66667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "square": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="queue-02"><path id="Vector" d="M12 12H4C3.37146 12 3.05719 12 2.86193 11.8047C2.66667 11.6095 2.66667 11.2952 2.66667 10.6667C2.66667 10.0381 2.66667 9.72387 2.86193 9.5286C3.05719 9.33333 3.37146 9.33333 4 9.33333H12C12.6285 9.33333 12.9428 9.33333 13.1381 9.5286C13.3333 9.72387 13.3333 10.0381 13.3333 10.6667C13.3333 11.2952 13.3333 11.6095 13.1381 11.8047C12.9428 12 12.6285 12 12 12Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M2.66667 6.66667H13.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_3" d="M2.66667 4H13.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "border-all-01": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="border-all-01"><path id="Vector" d="M2.59416 2.59416C3.52166 1.66667 5.01444 1.66667 8 1.66667C10.9855 1.66667 12.4783 1.66667 13.4059 2.59416C14.3333 3.52166 14.3333 5.01444 14.3333 8C14.3333 10.9855 14.3333 12.4783 13.4059 13.4059C12.4783 14.3333 10.9855 14.3333 8 14.3333C5.01444 14.3333 3.52166 14.3333 2.59416 13.4059C1.66667 12.4783 1.66667 10.9855 1.66667 8C1.66667 5.01444 1.66667 3.52166 2.59416 2.59416Z" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M8 1.66667V2.93333M8 13.0667V14.3333M6.1 8H9.9M13.0667 8H14.3333M1.66667 8H2.93333M8 6.09999V9.9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "stroke-top": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="stroke-top"><path id="Vector" d="M12.6666 4.66667V10C12.6666 11.8856 12.6666 12.8284 12.0808 13.4142C11.495 14 10.5522 14 8.66663 14H7.33329C5.44767 14 4.50487 14 3.91908 13.4142C3.33329 12.8284 3.33329 11.8856 3.33329 10V4.66667" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M14 1.9987H1.99996" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "stroke-right": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="stroke-right"><path id="Vector" d="M11.3334 12.6667H6.00008C4.11446 12.6667 3.17165 12.6667 2.58587 12.0809C2.00008 11.4951 2.00008 10.5523 2.00008 8.66667V7.33333C2.00008 5.44771 2.00008 4.50491 2.58587 3.91912C3.17165 3.33333 4.11446 3.33333 6.00008 3.33333H11.3334" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M13.9988 14V2" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "stroke-left": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="stroke-left"><path id="Vector" d="M4.66675 3.33333H10.0001C11.8857 3.33333 12.8285 3.33333 13.4143 3.91912C14.0001 4.50491 14.0001 5.44771 14.0001 7.33333V8.66667C14.0001 10.5523 14.0001 11.4951 13.4143 12.0809C12.8285 12.6667 11.8857 12.6667 10.0001 12.6667H4.66675" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M2.00008 2V14" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "stroke-bottom": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="stroke-bottom"><path id="Vector" d="M3.33341 11.3333V6C3.33341 4.11438 3.33341 3.17157 3.9192 2.58579C4.50499 2 5.44779 2 7.33341 2H8.66675C10.5523 2 11.4951 2 12.0809 2.58579C12.6667 3.17157 12.6667 4.11438 12.6667 6V11.3333" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M2.00008 14H14.0001" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "link": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="link"><path id="Vector" d="M9.99724 11.3333H11.3306C13.1715 11.3333 14.6639 9.84093 14.6639 8C14.6639 6.15905 13.1715 4.66667 11.3306 4.66667H9.99724M5.99723 11.3333H4.6639C2.82295 11.3333 1.33057 9.84093 1.33057 8C1.33057 6.15905 2.82295 4.66667 4.6639 4.66667H5.99723" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_2" d="M5.6639 8H10.3306" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"/></g></svg>', "link-off": '<svg preserveAspectRatio="xMidYMid meet" overflow="visible" style="display: block;" width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="link-off"><path id="Vector" d="M1.99609 2L21.9961 22" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path id="Vector_2" d="M8.99609 17C7.62926 17 6.99609 17 6.99609 17C4.23467 17 1.99609 14.7614 1.99609 12C1.99609 9.23858 4.23467 7 6.99609 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_3" d="M20.9965 15C21.6241 14.1643 21.9961 13.1256 21.9961 12C21.9961 9.23858 19.7575 7 16.9961 7H13.4961" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_4" d="M16.9961 17H14.9961" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path id="Vector_5" d="M8.49609 12H11.9961" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></g></svg>' };
   function icon(name) {
     return icons[name] || "";
+  }
+
+  // src/ui/colorPopover.js
+  var PRESETS = ["#FFFFFF", "#151515", "#58AEFF", "#FF8858", "#33D69F", "#FFCB47", "#E05151", "#B36BFF"];
+  var openState = null;
+  function closeColorPopover() {
+    if (!openState) return;
+    const { pop, onDoc, onKey } = openState;
+    pop.remove();
+    document.removeEventListener("mousedown", onDoc, true);
+    document.removeEventListener("keydown", onKey, true);
+    window.removeEventListener("scroll", onDoc, true);
+    openState = null;
+  }
+  function openColorPopover(anchor, layer, onChange) {
+    if (openState && openState.anchor === anchor) return closeColorPopover();
+    closeColorPopover();
+    const root = anchor.getRootNode();
+    const wrap = root.querySelector && root.querySelector(".wrap") || document.body;
+    let L = JSON.parse(JSON.stringify(layer));
+    const emit = () => onChange(JSON.parse(JSON.stringify(L)));
+    const body = h("div", { class: "cpop-body" });
+    const tab = (id, label) => h("button", {
+      class: "cpop-tab" + (L.type === id ? " on" : ""),
+      text: label,
+      onclick: () => {
+        if (L.type !== id) {
+          L = defaultLayer(id);
+          emit();
+          render2();
+        }
+      }
+    });
+    const tabs = h("div", { class: "cpop-tabs" }, [tab("solid", "Solid"), tab("linear", "Gradient"), tab("image", "Image")]);
+    const pop = h("div", { class: "cpop", "data-inspect-ui": "" }, [tabs, body]);
+    wrap.appendChild(pop);
+    function refreshTabs() {
+      [...tabs.children].forEach((b) => b.classList.toggle("on", b.textContent.toLowerCase().startsWith(L.type === "linear" ? "grad" : L.type)));
+    }
+    function render2() {
+      refreshTabs();
+      body.innerHTML = "";
+      if (L.type === "solid") body.append(solidEditor());
+      else if (L.type === "linear") body.append(gradientEditor());
+      else body.append(imageEditor());
+    }
+    function solidEditor() {
+      var _a;
+      const wrapEl = h("div", { class: "cpop-col" });
+      const picker = h("input", { type: "color", class: "cpop-color", value: safeHex(L.color) });
+      picker.addEventListener("input", () => {
+        L.color = picker.value.toUpperCase();
+        hex.value = L.color.replace("#", "");
+        emit();
+      });
+      const hex = h("input", { class: "cpop-hex", value: (L.color || "#FFFFFF").replace("#", "") });
+      hex.addEventListener("change", () => {
+        const v = hex.value.trim().replace(/^#/, "");
+        if (/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) {
+          L.color = "#" + v.toUpperCase();
+          picker.value = "#" + v;
+          emit();
+        }
+      });
+      const alpha = h("input", { class: "cpop-alpha", value: Math.round(((_a = L.alpha) != null ? _a : 1) * 100) });
+      alpha.addEventListener("change", () => {
+        L.alpha = clamp01(parseFloat(alpha.value) / 100);
+        emit();
+      });
+      wrapEl.append(
+        h("div", { class: "cpop-field" }, [picker, hex, h("span", { class: "cpop-unit" }, [alpha, h("span", { text: "%" })])]),
+        h("div", { class: "cpop-presets" }, PRESETS.map((c) => h("button", {
+          class: "cpop-preset",
+          style: { background: c },
+          title: c,
+          onclick: () => {
+            L.color = c;
+            L.alpha = 1;
+            emit();
+            render2();
+          }
+        })))
+      );
+      return wrapEl;
+    }
+    function gradientEditor() {
+      var _a;
+      const col = h("div", { class: "cpop-col" });
+      const preview = h("div", { class: "cpop-gradient-preview" });
+      const paint = () => {
+        preview.style.background = layerCss(L);
+      };
+      paint();
+      const angle = h("input", { class: "cpop-angle", value: (_a = L.angle) != null ? _a : 180 });
+      angle.addEventListener("change", () => {
+        L.angle = parseFloat(angle.value) || 0;
+        emit();
+        paint();
+      });
+      const stopList = h("div", { class: "cpop-stops" });
+      const drawStops = () => {
+        stopList.innerHTML = "";
+        L.stops.forEach((s, i) => {
+          const sw = h("input", { type: "color", class: "cpop-stop-color", value: safeHex(s.color) });
+          sw.addEventListener("input", () => {
+            s.color = sw.value.toUpperCase();
+            emit();
+            paint();
+          });
+          const pos = h("input", { class: "cpop-stop-pos", value: s.pos });
+          pos.addEventListener("change", () => {
+            s.pos = clamp(parseFloat(pos.value) || 0, 0, 100);
+            emit();
+            paint();
+          });
+          const del = h("button", {
+            class: "cpop-stop-del",
+            html: icon("minus-sign"),
+            title: "Remove stop",
+            onclick: () => {
+              if (L.stops.length > 2) {
+                L.stops.splice(i, 1);
+                emit();
+                paint();
+                drawStops();
+              }
+            }
+          });
+          stopList.append(h("div", { class: "cpop-stop" }, [sw, h("span", { class: "cpop-stop-hex", text: (s.color || "").replace("#", "") }), pos, h("span", { class: "cpop-unit-s", text: "%" }), del]));
+        });
+      };
+      drawStops();
+      col.append(
+        preview,
+        h("div", { class: "cpop-field cpop-angle-row" }, [h("span", { class: "cpop-lab", text: "Angle" }), angle, h("span", { class: "cpop-unit-s", text: "\xB0" })]),
+        stopList,
+        h("button", { class: "cpop-add", html: icon("plus"), onclick: () => {
+          L.stops.push({ color: "#FFFFFF", alpha: 1, pos: 100 });
+          emit();
+          paint();
+          drawStops();
+        } }, ["Add stop"])
+      );
+      return col;
+    }
+    function imageEditor() {
+      const col = h("div", { class: "cpop-col" });
+      const url = h("input", { class: "cpop-url", placeholder: "Image URL", value: L.url || "" });
+      url.addEventListener("change", () => {
+        L.url = url.value.trim();
+        emit();
+      });
+      const file = h("input", { type: "file", accept: "image/*", style: { display: "none" } });
+      file.addEventListener("change", () => {
+        const f = file.files && file.files[0];
+        if (!f) return;
+        const r2 = new FileReader();
+        r2.onload = () => {
+          L.url = r2.result;
+          url.value = "uploaded image";
+          emit();
+        };
+        r2.readAsDataURL(f);
+      });
+      const upload = h("button", { class: "cpop-add", html: icon("component"), onclick: () => file.click() }, ["Upload"]);
+      const fits = ["cover", "contain", "fill"];
+      const fitRow = h("div", { class: "cpop-fits" }, fits.map((f) => h("button", {
+        class: "cpop-fit" + ((L.fit || "cover") === f ? " on" : ""),
+        text: f,
+        onclick: () => {
+          L.fit = f;
+          emit();
+          [...fitRow.children].forEach((b) => b.classList.toggle("on", b.textContent === f));
+        }
+      })));
+      col.append(h("div", { class: "cpop-field" }, [url]), h("div", { class: "cpop-imgrow" }, [upload, file]), fitRow);
+      return col;
+    }
+    render2();
+    const r = anchor.getBoundingClientRect();
+    pop.style.left = Math.round(Math.min(r.left, window.innerWidth - 250)) + "px";
+    pop.style.top = Math.round(r.bottom + 6) + "px";
+    const pr = pop.getBoundingClientRect();
+    if (pr.bottom > window.innerHeight - 8) pop.style.top = Math.round(r.top - pr.height - 6) + "px";
+    const onDoc = (e) => {
+      if (!e.composedPath().includes(pop) && !e.composedPath().includes(anchor)) closeColorPopover();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") closeColorPopover();
+    };
+    setTimeout(() => {
+      document.addEventListener("mousedown", onDoc, true);
+      document.addEventListener("keydown", onKey, true);
+      window.addEventListener("scroll", onDoc, true);
+    }, 0);
+    openState = { pop, anchor, onDoc, onKey };
+  }
+  function safeHex(c) {
+    return /^#[0-9a-f]{6}$/i.test(c || "") ? c : "#FFFFFF";
+  }
+  function clamp(v, a, b) {
+    return Math.max(a, Math.min(b, v));
+  }
+  function clamp01(v) {
+    return Math.max(0, Math.min(1, isFinite(v) ? v : 1));
   }
 
   // src/ui/components.js
@@ -1069,6 +1337,7 @@ ${body}
     }
     render() {
       const st = store.get();
+      closeColorPopover();
       const prevBody = this.el.querySelector(".panel-body");
       const prevScroll = prevBody ? prevBody.scrollTop : 0;
       this.el.classList.toggle("hidden", st.collapsed);
@@ -1241,21 +1510,17 @@ ${body}
         ];
         app.push(h("div", { class: "corner-grid" }, corners.map(([prop, v]) => field({ iconName: "full-screen", value: v, showUnit: false, onChange: onPx(prop) }))));
       }
-      const fillOn = hasColor(m.background.color);
+      const fills = getFills(el);
+      const applyFills = () => {
+        const props = compose(getFills(el));
+        Object.entries(props).forEach(([k, v]) => setProp(el, k, v));
+      };
       app.push(subHead("Fill", () => {
-        if (!fillOn) {
-          on("background-color")("#FFFFFF");
-          this.render();
-        }
-      }, { disabled: fillOn }));
-      if (fillOn) app.push(colorRow(
-        m.background.color,
-        on("background-color"),
-        () => {
-          on("background-color")("rgba(0, 0, 0, 0)");
-          this.render();
-        }
-      ));
+        getFills(el).unshift(defaultLayer("solid"));
+        applyFills();
+        this.render();
+      }));
+      fills.forEach((layer, i) => app.push(this._fillRow(el, i, applyFills)));
       const strokeOn = m.border.present;
       app.push(subHead("Stroke", () => {
         if (!strokeOn) {
@@ -1324,6 +1589,45 @@ ${body}
           ], { grow: true, seg: true, active: ["right", "center", "left", "justify"].indexOf(m.typography.textAlign), onPick: (b) => on("text-align")(b.css) }))
         ])
       ]));
+    }
+    // One fill-layer row: swatch preview + label, an alpha % for solids, a remove
+    // button. Clicking the swatch/label opens the colour editor (solid/gradient/image).
+    _fillRow(el, i, applyFills) {
+      var _a;
+      const layer = getFills(el)[i];
+      const swatch = h("button", { class: "cr-swatch cr-swatch-btn", title: "Edit fill" });
+      swatch.style.background = layerCss(layer);
+      const desc = h("span", { class: "cr-hex-text", text: layerLabel(layer) });
+      const main = h("div", { class: "cr-main cr-main-btn" }, [swatch, desc]);
+      const alpha = h("input", { class: "cr-alpha", value: Math.round(((_a = layer.alpha) != null ? _a : 1) * 100) });
+      alpha.addEventListener("change", () => {
+        const cur = getFills(el)[i];
+        cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
+        applyFills();
+        swatch.style.background = layerCss(cur);
+      });
+      main.addEventListener("click", () => openColorPopover(main, getFills(el)[i], (updated) => {
+        var _a2;
+        getFills(el)[i] = updated;
+        applyFills();
+        swatch.style.background = layerCss(updated);
+        desc.textContent = layerLabel(updated);
+        alpha.value = Math.round(((_a2 = updated.alpha) != null ? _a2 : 1) * 100);
+      }));
+      const del = h("button", {
+        class: "cr-del",
+        title: "Remove fill",
+        html: icon("minus-sign"),
+        onclick: () => {
+          getFills(el).splice(i, 1);
+          applyFills();
+          this.render();
+        }
+      });
+      const parts = [main];
+      if (layer.type === "solid") parts.push(h("div", { class: "cr-pct" }, [alpha, h("span", { class: "cr-unit", text: "%" })]));
+      parts.push(del);
+      return h("div", { class: "color-row" }, parts);
     }
     // ---------------- Changes view (change log + generated CSS + AI prompt) ----------------
     _changes(body) {
@@ -2466,6 +2770,47 @@ ${fontFace}
 .cr-del { width: 30px; flex: none; display: grid; place-items: center; background: var(--field); border: none; border-radius: 8px 12px 12px 8px; color: var(--text); cursor: pointer; }
 .cr-del:hover { color: #e05151; }
 .cr-del svg { width: 14px; height: 14px; }
+/* fill-layer row (clickable swatch + label) */
+.cr-main-btn { cursor: pointer; }
+.cr-main-btn:hover { border-color: var(--tool-border); }
+.cr-swatch-btn { padding: 0; cursor: pointer; background-size: cover; background-position: center; }
+.cr-hex-text { flex: 1; min-width: 0; color: var(--text); font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Colour popover (solid / gradient / image) ---------- */
+.cpop { position: fixed; z-index: 2147483647; width: 234px; background: #1c1c1c; border: 1px solid var(--tool-border); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.6); padding: 10px; display: flex; flex-direction: column; gap: 10px; font-family: var(--font); }
+.cpop-tabs { display: flex; gap: 4px; background: var(--field); border-radius: 10px; padding: 3px; }
+.cpop-tab { flex: 1; height: 26px; border: none; border-radius: 7px; background: transparent; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; }
+.cpop-tab.on { background: var(--field-active); color: var(--text); }
+.cpop-col { display: flex; flex-direction: column; gap: 8px; }
+.cpop-field { display: flex; align-items: center; gap: 8px; background: var(--field); border-radius: 10px; padding: 7px; min-height: 34px; }
+.cpop-color, .cpop-stop-color { width: 22px; height: 22px; border: none; border-radius: 6px; background: none; padding: 0; cursor: pointer; flex: none; }
+.cpop-color::-webkit-color-swatch-wrapper, .cpop-stop-color::-webkit-color-swatch-wrapper { padding: 0; }
+.cpop-color::-webkit-color-swatch, .cpop-stop-color::-webkit-color-swatch { border: 1px solid rgba(255,255,255,.18); border-radius: 6px; }
+.cpop-hex { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-family: var(--font); text-transform: uppercase; }
+.cpop-unit { display: flex; align-items: center; gap: 2px; color: var(--muted); font-size: 14px; flex: none; }
+.cpop-alpha { width: 30px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-family: var(--font); text-align: right; }
+.cpop-presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+.cpop-preset { height: 20px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); cursor: pointer; padding: 0; }
+.cpop-gradient-preview { height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); }
+.cpop-lab { color: var(--muted); font-size: 13px; flex: none; }
+.cpop-angle { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-family: var(--font); }
+.cpop-stops { display: flex; flex-direction: column; gap: 6px; }
+.cpop-stop { display: flex; align-items: center; gap: 7px; background: var(--field); border-radius: 10px; padding: 6px 7px; }
+.cpop-stop-color { width: 20px; height: 20px; }
+.cpop-stop-hex { flex: 1; min-width: 0; text-transform: uppercase; color: var(--text); font-size: 13px; overflow: hidden; }
+.cpop-stop-pos { width: 30px; background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; text-align: right; font-family: var(--font); }
+.cpop-unit-s { color: var(--muted); font-size: 13px; flex: none; }
+.cpop-stop-del { width: 18px; height: 18px; display: grid; place-items: center; background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0; flex: none; }
+.cpop-stop-del:hover { color: #e05151; }
+.cpop-stop-del svg { width: 14px; height: 14px; }
+.cpop-add { display: flex; align-items: center; justify-content: center; gap: 6px; height: 30px; background: var(--field); border: none; border-radius: 9px; color: var(--text); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; }
+.cpop-add:hover { background: var(--field-2); }
+.cpop-add svg { width: 15px; height: 15px; }
+.cpop-url { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; font-family: var(--font); }
+.cpop-imgrow { display: flex; }
+.cpop-fits { display: flex; gap: 4px; }
+.cpop-fit { flex: 1; height: 28px; border: none; border-radius: 8px; background: var(--field); color: var(--muted); font-family: var(--font); font-size: 13px; cursor: pointer; }
+.cpop-fit.on { background: var(--field-active); color: var(--text); }
 
 /* legacy single colour line (kept for compatibility) */
 .colorline { display: flex; align-items: center; gap: 7px; background: var(--field); border-radius: var(--r-field); padding: 7px; height: 32px; }
@@ -2808,7 +3153,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.9.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.10.0" };
   }
   boot();
 })();

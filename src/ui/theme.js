@@ -218,6 +218,47 @@ ${fontFace}
 .cr-del { width: 30px; flex: none; display: grid; place-items: center; background: var(--field); border: none; border-radius: 8px 12px 12px 8px; color: var(--text); cursor: pointer; }
 .cr-del:hover { color: #e05151; }
 .cr-del svg { width: 14px; height: 14px; }
+/* fill-layer row (clickable swatch + label) */
+.cr-main-btn { cursor: pointer; }
+.cr-main-btn:hover { border-color: var(--tool-border); }
+.cr-swatch-btn { padding: 0; cursor: pointer; background-size: cover; background-position: center; }
+.cr-hex-text { flex: 1; min-width: 0; color: var(--text); font-size: 14px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- Colour popover (solid / gradient / image) ---------- */
+.cpop { position: fixed; z-index: 2147483647; width: 234px; background: #1c1c1c; border: 1px solid var(--tool-border); border-radius: 14px; box-shadow: 0 18px 50px rgba(0,0,0,.6); padding: 10px; display: flex; flex-direction: column; gap: 10px; font-family: var(--font); }
+.cpop-tabs { display: flex; gap: 4px; background: var(--field); border-radius: 10px; padding: 3px; }
+.cpop-tab { flex: 1; height: 26px; border: none; border-radius: 7px; background: transparent; color: var(--muted); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; }
+.cpop-tab.on { background: var(--field-active); color: var(--text); }
+.cpop-col { display: flex; flex-direction: column; gap: 8px; }
+.cpop-field { display: flex; align-items: center; gap: 8px; background: var(--field); border-radius: 10px; padding: 7px; min-height: 34px; }
+.cpop-color, .cpop-stop-color { width: 22px; height: 22px; border: none; border-radius: 6px; background: none; padding: 0; cursor: pointer; flex: none; }
+.cpop-color::-webkit-color-swatch-wrapper, .cpop-stop-color::-webkit-color-swatch-wrapper { padding: 0; }
+.cpop-color::-webkit-color-swatch, .cpop-stop-color::-webkit-color-swatch { border: 1px solid rgba(255,255,255,.18); border-radius: 6px; }
+.cpop-hex { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-family: var(--font); text-transform: uppercase; }
+.cpop-unit { display: flex; align-items: center; gap: 2px; color: var(--muted); font-size: 14px; flex: none; }
+.cpop-alpha { width: 30px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-family: var(--font); text-align: right; }
+.cpop-presets { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; }
+.cpop-preset { height: 20px; border-radius: 5px; border: 1px solid rgba(255,255,255,.14); cursor: pointer; padding: 0; }
+.cpop-gradient-preview { height: 34px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12); }
+.cpop-lab { color: var(--muted); font-size: 13px; flex: none; }
+.cpop-angle { flex: 1; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-family: var(--font); }
+.cpop-stops { display: flex; flex-direction: column; gap: 6px; }
+.cpop-stop { display: flex; align-items: center; gap: 7px; background: var(--field); border-radius: 10px; padding: 6px 7px; }
+.cpop-stop-color { width: 20px; height: 20px; }
+.cpop-stop-hex { flex: 1; min-width: 0; text-transform: uppercase; color: var(--text); font-size: 13px; overflow: hidden; }
+.cpop-stop-pos { width: 30px; background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; text-align: right; font-family: var(--font); }
+.cpop-unit-s { color: var(--muted); font-size: 13px; flex: none; }
+.cpop-stop-del { width: 18px; height: 18px; display: grid; place-items: center; background: transparent; border: none; color: var(--muted); cursor: pointer; padding: 0; flex: none; }
+.cpop-stop-del:hover { color: #e05151; }
+.cpop-stop-del svg { width: 14px; height: 14px; }
+.cpop-add { display: flex; align-items: center; justify-content: center; gap: 6px; height: 30px; background: var(--field); border: none; border-radius: 9px; color: var(--text); font-family: var(--font); font-size: 13px; font-weight: 500; cursor: pointer; }
+.cpop-add:hover { background: var(--field-2); }
+.cpop-add svg { width: 15px; height: 15px; }
+.cpop-url { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; font-family: var(--font); }
+.cpop-imgrow { display: flex; }
+.cpop-fits { display: flex; gap: 4px; }
+.cpop-fit { flex: 1; height: 28px; border: none; border-radius: 8px; background: var(--field); color: var(--muted); font-family: var(--font); font-size: 13px; cursor: pointer; }
+.cpop-fit.on { background: var(--field-active); color: var(--text); }
 
 /* legacy single colour line (kept for compatibility) */
 .colorline { display: flex; align-items: center; gap: 7px; background: var(--field); border-radius: var(--r-field); padding: 7px; height: 32px; }

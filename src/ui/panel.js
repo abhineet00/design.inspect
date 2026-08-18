@@ -9,6 +9,8 @@ import { collectAll } from '../core/assets.js';
 import { getLog, describe, generateAiPrompt, clearLog, logChange } from '../core/changeLog.js';
 import { cssPath } from '../core/selector.js';
 import { record } from '../core/history.js';
+import { getFills, compose, layerCss, layerLabel, defaultLayer } from '../core/fills.js';
+import { openColorPopover, closeColorPopover } from './colorPopover.js';
 import { icon } from '../icons/index.js';
 import {
   field, selectField, iconButtons, colorRow, section, labeled, spacingBox,
@@ -28,6 +30,7 @@ export class Panel {
 
   render() {
     const st = store.get();
+    closeColorPopover();
     // preserve scroll position across re-renders (edits re-render the body)
     const prevBody = this.el.querySelector('.panel-body');
     const prevScroll = prevBody ? prevBody.scrollTop : 0;
@@ -194,11 +197,12 @@ export class Panel {
         field({ iconName: 'full-screen', value: v, showUnit: false, onChange: onPx(prop) }))));
     }
 
-    // Fill (background-color): plus adds, the row's minus removes.
-    const fillOn = hasColor(m.background.color);
-    app.push(subHead('Fill', () => { if (!fillOn) { on('background-color')('#FFFFFF'); this.render(); } }, { disabled: fillOn }));
-    if (fillOn) app.push(colorRow(m.background.color, on('background-color'),
-      () => { on('background-color')('rgba(0, 0, 0, 0)'); this.render(); }));
+    // Fill: an ordered list of layers (solid / gradient / image). Plus adds a
+    // new layer on top; each row's swatch opens the colour editor.
+    const fills = getFills(el);
+    const applyFills = () => { const props = compose(getFills(el)); Object.entries(props).forEach(([k, v]) => setProp(el, k, v)); };
+    app.push(subHead('Fill', () => { getFills(el).unshift(defaultLayer('solid')); applyFills(); this.render(); }));
+    fills.forEach((layer, i) => app.push(this._fillRow(el, i, applyFills)));
 
     // Stroke (border): colour row + width row (single/"mix" + expand-to-4-sides).
     const strokeOn = m.border.present;
@@ -255,6 +259,38 @@ export class Panel {
         ], { grow: true, seg: true, active: ['right', 'center', 'left', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
       ]),
     ]));
+  }
+
+  // One fill-layer row: swatch preview + label, an alpha % for solids, a remove
+  // button. Clicking the swatch/label opens the colour editor (solid/gradient/image).
+  _fillRow(el, i, applyFills) {
+    const layer = getFills(el)[i];
+    const swatch = h('button', { class: 'cr-swatch cr-swatch-btn', title: 'Edit fill' });
+    swatch.style.background = layerCss(layer);
+    const desc = h('span', { class: 'cr-hex-text', text: layerLabel(layer) });
+    const main = h('div', { class: 'cr-main cr-main-btn' }, [swatch, desc]);
+
+    const alpha = h('input', { class: 'cr-alpha', value: Math.round((layer.alpha ?? 1) * 100) });
+    alpha.addEventListener('change', () => {
+      const cur = getFills(el)[i]; cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
+      applyFills(); swatch.style.background = layerCss(cur);
+    });
+
+    main.addEventListener('click', () => openColorPopover(main, getFills(el)[i], (updated) => {
+      getFills(el)[i] = updated;
+      applyFills();
+      swatch.style.background = layerCss(updated);
+      desc.textContent = layerLabel(updated);
+      alpha.value = Math.round((updated.alpha ?? 1) * 100);
+    }));
+
+    const del = h('button', { class: 'cr-del', title: 'Remove fill', html: icon('minus-sign'),
+      onclick: () => { getFills(el).splice(i, 1); applyFills(); this.render(); } });
+
+    const parts = [main];
+    if (layer.type === 'solid') parts.push(h('div', { class: 'cr-pct' }, [alpha, h('span', { class: 'cr-unit', text: '%' })]));
+    parts.push(del);
+    return h('div', { class: 'color-row' }, parts);
   }
 
   // ---------------- Changes view (change log + generated CSS + AI prompt) ----------------
