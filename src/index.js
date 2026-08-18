@@ -37,8 +37,8 @@ class App {
 
     this.overlay = new Overlay(document.documentElement);
     this.panel = new Panel(wrap, {
-      hover: (el) => this.overlay.highlight(el),
-      unhover: () => { if (!store.get().active) this.overlay.hideHover(); },
+      hover: (el) => { store.set({ hoverEl: el }); this.overlay.highlight(el); },
+      unhover: () => { store.set({ hoverEl: null }); this.overlay.hideHover(); },
       pick: (el) => this.select(el),
     });
     this.tooltip = new Tooltip(wrap);
@@ -117,8 +117,10 @@ class App {
     if (!el) return;
     let next = null;
     if (dir === 'parent') {
+      // Walk all the way up to <body> / <html> (skip our own UI host).
       next = el.parentElement;
-      if (!next || next === document.documentElement || next === document.body) return;
+      while (next && next.closest && next.closest('[data-inspect-ui]')) next = next.parentElement;
+      if (!next) return;
     } else {
       next = [...el.children].find((c) => !c.closest('[data-inspect-ui]'));
       if (!next) return;
@@ -187,7 +189,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.12.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.13.0' };
 }
 
 boot();

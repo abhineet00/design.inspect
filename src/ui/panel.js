@@ -322,20 +322,16 @@ export class Panel {
       return;
     }
 
-    // Change log list
-    body.append(assetSection('Change log', log.length,
-      h('div', { class: 'log-list' }, [...log].reverse().map((e) =>
-        h('div', { class: 'log-item' }, [
-          h('span', { class: 'log-el', text: e.label || e.selector }),
-          h('span', { class: 'log-desc', text: describe(e) }),
-        ])
-      ))
+    // Generated CSS — the primary output, shown first and open.
+    body.append(assetSection('Generated CSS', 0,
+      cssText ? h('pre', { class: 'code', html: highlight(cssText) })
+              : h('div', { class: 'empty', text: 'No CSS edits.' })
     ));
 
-    // AI prompt preview (with a Final / Diff style toggle)
+    // AI prompt preview (with a Final / Diff style toggle) — collapsed by default.
     const styleToggle = h('div', { class: 'seg-toggle' }, [
-      h('button', { class: 'seg-btn' + (!st.promptDiff ? ' on' : ''), text: 'Final', onclick: () => { store.get().promptDiff = false; store.set({ promptDiff: false }); this.render(); } }),
-      h('button', { class: 'seg-btn' + (st.promptDiff ? ' on' : ''), text: 'Diff', onclick: () => { store.get().promptDiff = true; store.set({ promptDiff: true }); this.render(); } }),
+      h('button', { class: 'seg-btn' + (!st.promptDiff ? ' on' : ''), text: 'Final', onclick: (e) => { e.stopPropagation(); store.set({ promptDiff: false }); this.render(); } }),
+      h('button', { class: 'seg-btn' + (st.promptDiff ? ' on' : ''), text: 'Diff', onclick: (e) => { e.stopPropagation(); store.set({ promptDiff: true }); this.render(); } }),
     ]);
     body.append(assetSection('AI prompt', 0,
       h('div', {}, [
@@ -344,13 +340,17 @@ export class Panel {
           styleToggle,
         ]),
         h('pre', { class: 'code ai-prompt', text: prompt }),
-      ])
+      ]), { closed: true }
     ));
 
-    // Generated CSS
-    body.append(assetSection('Generated CSS', 0,
-      cssText ? h('pre', { class: 'code', html: highlight(cssText) })
-              : h('div', { class: 'empty', text: 'No CSS edits.' })
+    // Change log — the long list, last and collapsed by default.
+    body.append(assetSection('Change log', log.length,
+      h('div', { class: 'log-list' }, [...log].reverse().map((e) =>
+        h('div', { class: 'log-item' }, [
+          h('span', { class: 'log-el', text: e.label || e.selector }),
+          h('span', { class: 'log-desc', text: describe(e) }),
+        ])
+      )), { closed: true }
     ));
   }
 
@@ -366,6 +366,9 @@ export class Panel {
     }
 
     const tree = h('div', { class: 'domtree' });
+    // Leaving the whole tree clears the page highlight; moving between rows just
+    // updates it (each row's mouseenter re-highlights), so no flicker.
+    tree.addEventListener('mouseleave', () => this.api.unhover?.());
     this._renderNode(document.documentElement, tree, 0);
 
     const footer = h('div', { class: 'tree-footer' }, [
@@ -400,9 +403,9 @@ export class Panel {
       style: { paddingLeft: pad + 'px' } }, [
       tw, h('span', { class: 'tree-tag', html: tagOpenHtml(el, hasKids && !expanded) }),
     ]);
-    // Hover a row → highlight that element on the page (like picking).
+    // Hover a row → highlight that element on the page (like picking). The hide
+    // is handled once on the tree container's mouseleave, not per row.
     row.addEventListener('mouseenter', () => this.api.hover?.(el));
-    row.addEventListener('mouseleave', () => this.api.unhover?.());
     // Click a row → select it and open its property panel (design view).
     row.addEventListener('click', () => {
       this.api.unhover?.();
@@ -553,12 +556,12 @@ function hasColor(c) {
   if (m) { const a = m[1].split(',')[3]; return a == null || parseFloat(a) > 0; }
   return true;
 }
-function assetSection(title, count, content) {
+function assetSection(title, count, content, { closed = false } = {}) {
   const head = h('div', { class: 'sec-head' }, [
     h('span', {}, [title, count ? h('span', { class: 'asset-count', text: String(count) }) : null]),
     h('span', { class: 'chev', html: icon('chevron-down') }),
   ]);
-  const sec = h('div', { class: 'section' }, [head, h('div', { class: 'sec-content' }, [content])]);
+  const sec = h('div', { class: 'section' + (closed ? ' closed' : '') }, [head, h('div', { class: 'sec-content' }, [content])]);
   head.addEventListener('click', () => sec.classList.toggle('closed'));
   return sec;
 }

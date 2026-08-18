@@ -255,11 +255,12 @@
     }
     _onMove(e) {
       if (store.get().editing || store.get().dragging) return;
-      const el = this._target(e);
-      if (!el) return this.overlay.hideHover();
-      if (el === store.get().hoverEl) return;
-      store.set({ hoverEl: el });
-      this.overlay.highlight(el);
+      const raw = document.elementFromPoint(e.clientX, e.clientY);
+      if (raw && isOwnUI(raw)) return;
+      if (!raw || raw === document.documentElement || raw === document.body) return this.overlay.hideHover();
+      if (raw === store.get().hoverEl) return;
+      store.set({ hoverEl: raw });
+      this.overlay.highlight(raw);
     }
     _onClick(e) {
       if (isOwnUI(e.target)) return;
@@ -1664,23 +1665,18 @@ ${body}
         return;
       }
       body.append(assetSection(
-        "Change log",
-        log.length,
-        h("div", { class: "log-list" }, [...log].reverse().map(
-          (e) => h("div", { class: "log-item" }, [
-            h("span", { class: "log-el", text: e.label || e.selector }),
-            h("span", { class: "log-desc", text: describe(e) })
-          ])
-        ))
+        "Generated CSS",
+        0,
+        cssText ? h("pre", { class: "code", html: highlight(cssText) }) : h("div", { class: "empty", text: "No CSS edits." })
       ));
       const styleToggle = h("div", { class: "seg-toggle" }, [
-        h("button", { class: "seg-btn" + (!st.promptDiff ? " on" : ""), text: "Final", onclick: () => {
-          store.get().promptDiff = false;
+        h("button", { class: "seg-btn" + (!st.promptDiff ? " on" : ""), text: "Final", onclick: (e) => {
+          e.stopPropagation();
           store.set({ promptDiff: false });
           this.render();
         } }),
-        h("button", { class: "seg-btn" + (st.promptDiff ? " on" : ""), text: "Diff", onclick: () => {
-          store.get().promptDiff = true;
+        h("button", { class: "seg-btn" + (st.promptDiff ? " on" : ""), text: "Diff", onclick: (e) => {
+          e.stopPropagation();
           store.set({ promptDiff: true });
           this.render();
         } })
@@ -1694,12 +1690,19 @@ ${body}
             styleToggle
           ]),
           h("pre", { class: "code ai-prompt", text: prompt })
-        ])
+        ]),
+        { closed: true }
       ));
       body.append(assetSection(
-        "Generated CSS",
-        0,
-        cssText ? h("pre", { class: "code", html: highlight(cssText) }) : h("div", { class: "empty", text: "No CSS edits." })
+        "Change log",
+        log.length,
+        h("div", { class: "log-list" }, [...log].reverse().map(
+          (e) => h("div", { class: "log-item" }, [
+            h("span", { class: "log-el", text: e.label || e.selector }),
+            h("span", { class: "log-desc", text: describe(e) })
+          ])
+        )),
+        { closed: true }
       ));
     }
     // ---------------- HTML view: interactive DOM tree ----------------
@@ -1715,6 +1718,10 @@ ${body}
         }
       }
       const tree = h("div", { class: "domtree" });
+      tree.addEventListener("mouseleave", () => {
+        var _a, _b;
+        return (_b = (_a = this.api).unhover) == null ? void 0 : _b.call(_a);
+      });
       this._renderNode(document.documentElement, tree, 0);
       const footer = h("div", { class: "tree-footer" }, [
         h(
@@ -1759,10 +1766,6 @@ ${body}
       row.addEventListener("mouseenter", () => {
         var _a, _b;
         return (_b = (_a = this.api).hover) == null ? void 0 : _b.call(_a, el);
-      });
-      row.addEventListener("mouseleave", () => {
-        var _a, _b;
-        return (_b = (_a = this.api).unhover) == null ? void 0 : _b.call(_a);
       });
       row.addEventListener("click", () => {
         var _a, _b;
@@ -1925,12 +1928,12 @@ font-weight: ${t.weight};`, "Type style copied")
     }
     return true;
   }
-  function assetSection(title, count, content) {
+  function assetSection(title, count, content, { closed = false } = {}) {
     const head = h("div", { class: "sec-head" }, [
       h("span", {}, [title, count ? h("span", { class: "asset-count", text: String(count) }) : null]),
       h("span", { class: "chev", html: icon("chevron-down") })
     ]);
-    const sec = h("div", { class: "section" }, [head, h("div", { class: "sec-content" }, [content])]);
+    const sec = h("div", { class: "section" + (closed ? " closed" : "") }, [head, h("div", { class: "sec-content" }, [content])]);
     head.addEventListener("click", () => sec.classList.toggle("closed"));
     return sec;
   }
@@ -2636,9 +2639,19 @@ ${fontFace}
 
 /* The properties body is a distinct darker card nested under the header, so the
    lighter panel colour frames it at the top \u2014 the divided top/bottom look. */
-.panel-body { background: var(--body-bg); border-radius: 22px 22px 0 0; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; }
+.panel-body { background: var(--body-bg); border-radius: 22px 22px 0 0; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+
+/* Scrollbars everywhere in our UI follow the design language (never the OS
+   default white). scrollbar-gutter above keeps the body width stable when a
+   section opens/closes, so nothing jumps. */
+.wrap, .wrap * { scrollbar-width: thin; scrollbar-color: #333333 transparent; }
+.wrap ::-webkit-scrollbar { width: 9px; height: 9px; }
+.wrap ::-webkit-scrollbar-track { background: transparent; }
+.wrap ::-webkit-scrollbar-thumb { background: #333333; border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+.wrap ::-webkit-scrollbar-thumb:hover { background: #444444; }
+.wrap ::-webkit-scrollbar-corner { background: transparent; }
 .panel-body::-webkit-scrollbar { width: 9px; }
-.panel-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 9px; border: 3px solid transparent; background-clip: padding-box; }
+.panel-body::-webkit-scrollbar-thumb { background: #333333; border-radius: 9px; border: 3px solid transparent; background-clip: padding-box; }
 
 /* ---------- Header ---------- */
 .head { padding: 16px 16px 12px; cursor: grab; }
@@ -3013,9 +3026,13 @@ ${fontFace}
       document.head.appendChild(this.fontStyle);
       this.overlay = new Overlay(document.documentElement);
       this.panel = new Panel(wrap, {
-        hover: (el) => this.overlay.highlight(el),
+        hover: (el) => {
+          store.set({ hoverEl: el });
+          this.overlay.highlight(el);
+        },
         unhover: () => {
-          if (!store.get().active) this.overlay.hideHover();
+          store.set({ hoverEl: null });
+          this.overlay.hideHover();
         },
         pick: (el) => this.select(el)
       });
@@ -3104,7 +3121,8 @@ ${fontFace}
       let next = null;
       if (dir === "parent") {
         next = el.parentElement;
-        if (!next || next === document.documentElement || next === document.body) return;
+        while (next && next.closest && next.closest("[data-inspect-ui]")) next = next.parentElement;
+        if (!next) return;
       } else {
         next = [...el.children].find((c) => !c.closest("[data-inspect-ui]"));
         if (!next) return;
@@ -3174,7 +3192,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.12.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.13.0" };
   }
   boot();
 })();

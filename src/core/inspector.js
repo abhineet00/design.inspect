@@ -42,11 +42,14 @@ export class Inspector {
 
   _onMove(e) {
     if (store.get().editing || store.get().dragging) return;
-    const el = this._target(e);
-    if (!el) return this.overlay.hideHover();
-    if (el === store.get().hoverEl) return;
-    store.set({ hoverEl: el });
-    this.overlay.highlight(el);
+    const raw = document.elementFromPoint(e.clientX, e.clientY);
+    // Pointer is over our own panel/dock: leave the current highlight alone so a
+    // hover driven from the HTML tree stays visible instead of being wiped.
+    if (raw && isOwnUI(raw)) return;
+    if (!raw || raw === document.documentElement || raw === document.body) return this.overlay.hideHover();
+    if (raw === store.get().hoverEl) return;
+    store.set({ hoverEl: raw });
+    this.overlay.highlight(raw);
   }
 
   _onClick(e) {

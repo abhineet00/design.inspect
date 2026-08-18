@@ -71,9 +71,19 @@ ${fontFace}
 
 /* The properties body is a distinct darker card nested under the header, so the
    lighter panel colour frames it at the top — the divided top/bottom look. */
-.panel-body { background: var(--body-bg); border-radius: 22px 22px 0 0; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; }
+.panel-body { background: var(--body-bg); border-radius: 22px 22px 0 0; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+
+/* Scrollbars everywhere in our UI follow the design language (never the OS
+   default white). scrollbar-gutter above keeps the body width stable when a
+   section opens/closes, so nothing jumps. */
+.wrap, .wrap * { scrollbar-width: thin; scrollbar-color: #333333 transparent; }
+.wrap ::-webkit-scrollbar { width: 9px; height: 9px; }
+.wrap ::-webkit-scrollbar-track { background: transparent; }
+.wrap ::-webkit-scrollbar-thumb { background: #333333; border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
+.wrap ::-webkit-scrollbar-thumb:hover { background: #444444; }
+.wrap ::-webkit-scrollbar-corner { background: transparent; }
 .panel-body::-webkit-scrollbar { width: 9px; }
-.panel-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 9px; border: 3px solid transparent; background-clip: padding-box; }
+.panel-body::-webkit-scrollbar-thumb { background: #333333; border-radius: 9px; border: 3px solid transparent; background-clip: padding-box; }
 
 /* ---------- Header ---------- */
 .head { padding: 16px 16px 12px; cursor: grab; }
