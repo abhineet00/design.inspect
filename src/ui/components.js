@@ -13,6 +13,14 @@ function chevMini() {
 
 const UNIT_OPTIONS = ['px', '%', 'em', 'rem', 'vw', 'vh', 'auto'];
 
+// Clamp a number to the input's min/max attributes (when present) and round.
+function clampToInput(input, n) {
+  const mn = input.getAttribute('min'), mx = input.getAttribute('max');
+  if (mn !== null && n < parseFloat(mn)) n = parseFloat(mn);
+  if (mx !== null && n > parseFloat(mx)) n = parseFloat(mx);
+  return +n.toFixed(2);
+}
+
 // Turn a handle (a field's leading icon/letter) into a horizontal scrubber:
 // press and drag to change the number, shift for a coarse ×10 step.
 export function attachScrub(handle, input, commit, onDone) {
@@ -27,7 +35,7 @@ export function attachScrub(handle, input, commit, onDone) {
       const dx = ev.clientX - startX;
       if (!moved && Math.abs(dx) < 2) return;
       moved = true;
-      input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+      input.value = clampToInput(input, startV + dx * (ev.shiftKey ? 10 : 1));
       commit();
     };
     const onUp = () => {
@@ -54,7 +62,7 @@ export function attachInputScrub(input, commit, onDone) {
       const dx = ev.clientX - startX;
       if (!moved && Math.abs(dx) < 3) return;
       if (!moved) { moved = true; input.blur(); window.getSelection()?.removeAllRanges(); document.documentElement.style.cursor = 'ew-resize'; }
-      input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+      input.value = clampToInput(input, startV + dx * (ev.shiftKey ? 10 : 1));
       commit();
     };
     const onUp = () => {
@@ -70,18 +78,21 @@ export function attachInputScrub(input, commit, onDone) {
 
 /** Field with a leading key (letter or icon) and an optional unit.
  *  The leading handle scrubs the value; the unit opens a unit dropdown. */
-export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true, sm = false, scrub = true, onDone }) {
+export function field({ key, iconName, value, unit = 'px', onChange, showUnit = true, sm = false, scrub = true, onDone, min, max }) {
   const parsed = parseLength(value);
   // Only trust the parsed unit if the incoming value actually carried one;
   // otherwise use the caller's unit (e.g. '%' for opacity), not the px default.
   const hadUnit = /[a-z%]/i.test(String(value ?? ''));
   const input = h('input', { value: parsed.value, type: 'text', inputmode: 'decimal' });
+  if (min != null) input.setAttribute('min', min);
+  if (max != null) input.setAttribute('max', max);
   const unitEl = showUnit ? h('span', { class: 'unit unit-pick', text: hadUnit ? parsed.unit : unit }) : null;
 
   const commit = () => {
-    const raw = input.value.trim();
+    let raw = input.value.trim();
     if (raw === '') return onChange('');
     const numeric = /^-?[\d.]+$/.test(raw);
+    if (numeric && (min != null || max != null)) { raw = String(clampToInput(input, parseFloat(raw))); input.value = raw; }
     onChange(numeric && showUnit ? raw + (unitEl?.textContent || unit) : raw);
   };
   input.addEventListener('change', () => { commit(); onDone?.(); });
@@ -89,7 +100,7 @@ export function field({ key, iconName, value, unit = 'px', onChange, showUnit = 
     if (e.key === 'Enter') return input.blur();
     if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
       const cur = parseFloat(input.value) || 0;
-      input.value = +(cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1)).toFixed(2);
+      input.value = clampToInput(input, cur + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 10 : 1));
       commit(); e.preventDefault();
     }
   });
@@ -241,7 +252,7 @@ export function colorRow(value, onChange, onRemove) {
   const swatch = h('div', { class: 'cr-swatch' }, [picker]);
   swatch.style.background = value && value !== 'rgba(0, 0, 0, 0)' ? value : 'transparent';
   const hexInput = h('input', { class: 'cr-hex', value: hex.replace('#', '').toUpperCase() });
-  const alphaInput = h('input', { class: 'cr-alpha', value: Math.round(alpha * 100) });
+  const alphaInput = h('input', { class: 'cr-alpha', value: Math.round(alpha * 100), min: '0', max: '100' });
 
   const push = (hx) => { const out = hexToRgba(hx, alpha); swatch.style.background = out; onChange(out); };
   picker.addEventListener('input', () => { hexInput.value = picker.value.replace('#', '').toUpperCase(); push(picker.value); });
@@ -251,7 +262,8 @@ export function colorRow(value, onChange, onRemove) {
   });
   const alphaUnit = h('span', { class: 'cr-unit', text: '%' });
   const commitAlpha = () => {
-    alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
+    const pct = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0));
+    alphaInput.value = pct; alpha = pct / 100;
     push('#' + hexInput.value.trim().replace(/^#/, ''));
   };
   alphaInput.addEventListener('change', commitAlpha);

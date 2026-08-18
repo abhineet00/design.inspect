@@ -151,9 +151,9 @@ export class Panel {
     };
     body.append(section('Layout', [
       labeled('Size', h('div', { class: 'size-row' }, [
-        field({ key: 'W', value: m.layout.width, onDone: sync, onChange: onW }),
+        field({ key: 'W', value: m.layout.width, min: 0, onDone: sync, onChange: onW }),
         linkToggle(linked, () => { this._sizeLinked = !linked; this.render(); }),
-        field({ key: 'H', value: m.layout.height, onDone: sync, onChange: onH }),
+        field({ key: 'H', value: m.layout.height, min: 0, onDone: sync, onChange: onH }),
       ])),
       labeled('Display', selectField({
         value: m.layout.display,
@@ -161,8 +161,8 @@ export class Panel {
         onChange: on('display'),
       })),
       h('div', { class: 'row' }, [
-        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, sm: true, onChange: onPx('row-gap') })),
-        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, sm: true, onChange: onPx('column-gap') })),
+        labeled('Row Gap', field({ iconName: 'paragraph-spacing', value: m.layout.rowGap, showUnit: false, sm: true, min: 0, onChange: onPx('row-gap') })),
+        labeled('Column Gap', field({ iconName: 'letter-spacing', value: m.layout.columnGap, showUnit: false, sm: true, min: 0, onChange: onPx('column-gap') })),
       ]),
       h('div', { class: 'row' }, [
         labeled('Horizontal Align', selectField({ value: m.layout.justify, options: [['flex-start', 'Start'], ['center', 'Center'], ['flex-end', 'End'], ['space-between', 'Between']], onChange: on('justify-content') })),
@@ -173,17 +173,18 @@ export class Panel {
     // ----- Spacing -----
     // A combined H/V field shows "mix" when its two sides differ (e.g. after
     // editing one side in the box). Typing/scrubbing a value re-equalises both.
-    const axisField = (iconName, aVal, bVal, propA, propB) => {
+    const axisField = (iconName, aVal, bVal, propA, propB, min) => {
       const mixed = aVal !== bVal;
       return field({
-        iconName, value: mixed ? 'mix' : aVal, showUnit: !mixed, scrub: !mixed, onDone: sync,
+        iconName, value: mixed ? 'mix' : aVal, showUnit: !mixed, scrub: !mixed, onDone: sync, min,
         onChange: (v) => { onPx(propA)(v); onPx(propB)(v); },
       });
     };
     body.append(section('Spacing', [
+      // Padding can't be negative; margin can.
       labeled('Padding', h('div', { class: 'row' }, [
-        axisField('horizontal-resize', m.spacing.padding.left, m.spacing.padding.right, 'padding-left', 'padding-right'),
-        axisField('vertical-resize', m.spacing.padding.top, m.spacing.padding.bottom, 'padding-top', 'padding-bottom'),
+        axisField('horizontal-resize', m.spacing.padding.left, m.spacing.padding.right, 'padding-left', 'padding-right', 0),
+        axisField('vertical-resize', m.spacing.padding.top, m.spacing.padding.bottom, 'padding-top', 'padding-bottom', 0),
       ])),
       labeled('Margin', h('div', { class: 'row' }, [
         axisField('horizontal-resize', m.spacing.margin.left, m.spacing.margin.right, 'margin-left', 'margin-right'),
@@ -199,9 +200,9 @@ export class Panel {
 
     // Opacity + Corner (collapsed value + expand-to-4-corners toggle)
     app.push(h('div', { class: 'row' }, [
-      labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
+      labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', min: 0, max: 100, onChange: (v) => on('opacity')(Math.max(0, Math.min(100, parseFloat(v) || 100)) / 100) })),
       labeled('Corner', h('div', { class: 'corner-mix' }, [
-        field({ iconName: 'full-screen', value: cornerMixed ? 'mix' : m.radius.all, showUnit: false, scrub: !cornerMixed, onDone: sync, onChange: onPx('border-radius') }),
+        field({ iconName: 'full-screen', value: cornerMixed ? 'mix' : m.radius.all, showUnit: false, scrub: !cornerMixed, min: 0, onDone: sync, onChange: onPx('border-radius') }),
         expandBtn(cornerExp, 'full-screen', cornerExp ? 'Collapse corners' : 'Edit each corner', () => { this._cornerExpanded = !cornerExp; this.render(); }),
       ])),
     ]));
@@ -211,7 +212,7 @@ export class Panel {
         ['border-bottom-left-radius', m.radius.bl], ['border-bottom-right-radius', m.radius.br],
       ];
       app.push(h('div', { class: 'corner-grid' }, corners.map(([prop, v]) =>
-        field({ iconName: 'full-screen', value: v, showUnit: false, onDone: sync, onChange: onPx(prop) }))));
+        field({ iconName: 'full-screen', value: v, showUnit: false, min: 0, onDone: sync, onChange: onPx(prop) }))));
     }
 
     // Fill: an ordered list of layers (solid / gradient / image). Plus adds a
@@ -238,7 +239,7 @@ export class Panel {
       const widthMixed = new Set([sw.top, sw.right, sw.bottom, sw.left]).size > 1;
       const strokeExp = !!this._strokeSidesExpanded;
       app.push(h('div', { class: 'corner-mix' }, [
-        field({ iconName: 'square', value: widthMixed ? 'mix' : parseFloat(m.border.width) + '', showUnit: false, scrub: !widthMixed, onDone: sync,
+        field({ iconName: 'square', value: widthMixed ? 'mix' : parseFloat(m.border.width) + '', showUnit: false, scrub: !widthMixed, min: 0, onDone: sync,
           onChange: (v) => setProp(el, 'border-width', /^-?[\d.]+$/.test(String(v).trim()) ? v + 'px' : v) }),
         expandBtn(strokeExp, 'border-all-01', strokeExp ? 'Collapse sides' : 'Edit each side', () => { this._strokeSidesExpanded = !strokeExp; this.render(); }),
       ]));
@@ -248,7 +249,7 @@ export class Panel {
           ['border-left-width', 'stroke-left', sw.left], ['border-bottom-width', 'stroke-bottom', sw.bottom],
         ];
         app.push(h('div', { class: 'corner-grid' }, sides.map(([prop, ic, v]) =>
-          field({ iconName: ic, value: parseFloat(v) + '', showUnit: false, onDone: sync, onChange: onPx(prop) }))));
+          field({ iconName: ic, value: parseFloat(v) + '', showUnit: false, min: 0, onDone: sync, onChange: onPx(prop) }))));
       }
     }
     body.append(section('Appearance', app));
@@ -290,23 +291,31 @@ export class Panel {
     const desc = h('span', { class: 'cr-hex-text', text: layerLabel(layer) });
     const main = h('div', { class: 'cr-main cr-main-btn' }, [swatch, desc]);
 
-    const alpha = h('input', { class: 'cr-alpha', value: Math.round((layer.alpha ?? 1) * 100) });
+    const alpha = h('input', { class: 'cr-alpha', value: Math.round((layer.alpha ?? 1) * 100), min: '0', max: '100' });
     const alphaUnit = h('span', { class: 'cr-unit', text: '%' });
     const commitAlpha = () => {
-      const cur = getFills(el)[i]; cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
+      const pct = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0));
+      alpha.value = pct;
+      const cur = getFills(el)[i]; cur.alpha = pct / 100;
       applyFills(); swatch.style.background = layerCss(cur);
     };
     alpha.addEventListener('change', commitAlpha);
     attachInputScrub(alpha, commitAlpha);      // drag the number itself
     attachScrub(alphaUnit, alpha, commitAlpha); // …or drag the % as a handle
 
-    main.addEventListener('click', () => openColorPopover(main, getFills(el)[i], (updated) => {
-      getFills(el)[i] = updated;
-      applyFills();
-      swatch.style.background = layerCss(updated);
-      desc.textContent = layerLabel(updated);
-      alpha.value = Math.round((updated.alpha ?? 1) * 100);
-    }));
+    main.addEventListener('click', () => {
+      const cur = getFills(el)[i];
+      // A parsed radial/conic layer ('raw') has no editor of its own — open it as
+      // a fresh gradient so the swatch is still fully editable.
+      const editable = ['solid', 'linear', 'image'].includes(cur.type) ? cur : defaultLayer('linear');
+      openColorPopover(main, editable, (updated) => {
+        getFills(el)[i] = updated;
+        applyFills();
+        swatch.style.background = layerCss(updated);
+        desc.textContent = layerLabel(updated);
+        alpha.value = Math.round((updated.alpha ?? 1) * 100);
+      });
+    });
 
     const del = h('button', { class: 'cr-del', title: 'Remove fill', html: icon('minus-sign'),
       onclick: () => { getFills(el).splice(i, 1); applyFills(); this.render(); } });

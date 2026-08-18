@@ -753,13 +753,100 @@ ${body}
   }
   function derive(el) {
     const cs = getComputedStyle(el);
-    const bg = cs.backgroundColor;
     const layers = [];
+    const bgImg = cs.backgroundImage;
+    if (bgImg && bgImg !== "none") {
+      for (const tok of splitTop(bgImg)) {
+        const t = tok.trim();
+        if (!t || t === "none") continue;
+        if (/^linear-gradient/i.test(t)) layers.push(parseLinear(t));
+        else if (/^url\(/i.test(t)) layers.push({ type: "image", url: extractUrl(t), fit: fitFrom(cs) });
+        else layers.push({ type: "raw", css: t });
+      }
+    }
+    const bg = cs.backgroundColor;
     if (bg && bg !== "rgba(0, 0, 0, 0)" && bg !== "transparent") {
       const { hex, alpha } = rgbToHex(bg);
       layers.push({ type: "solid", color: hex, alpha: alpha == null ? 1 : alpha });
     }
     return layers;
+  }
+  function splitTop(str) {
+    const out = [];
+    let depth = 0, cur = "";
+    for (const ch of str) {
+      if (ch === "(") depth++;
+      else if (ch === ")") depth--;
+      if (ch === "," && depth === 0) {
+        out.push(cur);
+        cur = "";
+      } else cur += ch;
+    }
+    if (cur.trim()) out.push(cur);
+    return out;
+  }
+  function parseLinear(str) {
+    const inner = str.slice(str.indexOf("(") + 1, str.lastIndexOf(")"));
+    const parts = splitTop(inner).map((s) => s.trim());
+    let angle = 180, i = 0;
+    if (/^[\d.]+deg$/i.test(parts[0])) {
+      angle = parseFloat(parts[0]);
+      i = 1;
+    } else if (/^to\s+/i.test(parts[0])) {
+      angle = dirToAngle(parts[0]);
+      i = 1;
+    } else if (/^[\d.]+(rad|grad|turn)$/i.test(parts[0])) {
+      angle = 180;
+      i = 1;
+    }
+    const stops = [];
+    for (let k = i; k < parts.length; k++) {
+      const st = parseStop(parts[k]);
+      if (st) stops.push(st);
+    }
+    const n = stops.length;
+    stops.forEach((s, idx) => {
+      if (s.pos == null) s.pos = n <= 1 ? 0 : Math.round(idx / (n - 1) * 100);
+    });
+    return stops.length ? { type: "linear", angle, stops } : { type: "raw", css: str };
+  }
+  function parseStop(s) {
+    s = s.trim();
+    let pos = null, color = s;
+    const m = s.match(/\s+(-?[\d.]+)%\s*$/);
+    if (m) {
+      pos = parseFloat(m[1]);
+      color = s.slice(0, m.index).trim();
+    }
+    if (!color) return null;
+    const { hex, alpha } = rgbToHex(color);
+    return { color: hex, alpha: alpha == null ? 1 : alpha, pos };
+  }
+  function dirToAngle(dir) {
+    const d = dir.toLowerCase().replace(/^to\s+/, "").trim();
+    const map = {
+      top: 0,
+      right: 90,
+      bottom: 180,
+      left: 270,
+      "top right": 45,
+      "right top": 45,
+      "bottom right": 135,
+      "right bottom": 135,
+      "bottom left": 225,
+      "left bottom": 225,
+      "top left": 315,
+      "left top": 315
+    };
+    return map[d] != null ? map[d] : 180;
+  }
+  function extractUrl(str) {
+    const m = str.match(/url\(\s*(['"]?)(.*?)\1\s*\)/i);
+    return m ? m[2] : "";
+  }
+  function fitFrom(cs) {
+    const s = (cs.backgroundSize || "").split(",")[0].trim();
+    return s === "contain" || s === "cover" ? s : "cover";
   }
   function layerCss(L) {
     var _a, _b;
@@ -775,6 +862,7 @@ ${body}
       return `linear-gradient(${(_b = L.angle) != null ? _b : 180}deg, ${stops})`;
     }
     if (L.type === "image") return `url("${L.url}")`;
+    if (L.type === "raw") return L.css;
     return "none";
   }
   function compose(layers) {
@@ -800,6 +888,7 @@ ${body}
     if (L.type === "solid") return L.color.replace("#", "").toUpperCase();
     if (L.type === "linear") return "Gradient";
     if (L.type === "image") return "Image";
+    if (L.type === "raw") return "Gradient";
     return "";
   }
   function defaultLayer(type) {
@@ -1027,6 +1116,12 @@ ${body}
     return h("span", { class: "chev-mini", html: icon("chevron-down") });
   }
   var UNIT_OPTIONS = ["px", "%", "em", "rem", "vw", "vh", "auto"];
+  function clampToInput(input, n) {
+    const mn = input.getAttribute("min"), mx = input.getAttribute("max");
+    if (mn !== null && n < parseFloat(mn)) n = parseFloat(mn);
+    if (mx !== null && n > parseFloat(mx)) n = parseFloat(mx);
+    return +n.toFixed(2);
+  }
   function attachScrub(handle, input, commit, onDone) {
     handle.classList.add("scrub");
     handle.addEventListener("mousedown", (e) => {
@@ -1040,7 +1135,7 @@ ${body}
         const dx = ev.clientX - startX;
         if (!moved && Math.abs(dx) < 2) return;
         moved = true;
-        input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+        input.value = clampToInput(input, startV + dx * (ev.shiftKey ? 10 : 1));
         commit();
       };
       const onUp = () => {
@@ -1070,7 +1165,7 @@ ${body}
           (_a = window.getSelection()) == null ? void 0 : _a.removeAllRanges();
           document.documentElement.style.cursor = "ew-resize";
         }
-        input.value = +(startV + dx * (ev.shiftKey ? 10 : 1)).toFixed(2);
+        input.value = clampToInput(input, startV + dx * (ev.shiftKey ? 10 : 1));
         commit();
       };
       const onUp = () => {
@@ -1083,15 +1178,21 @@ ${body}
       document.addEventListener("mouseup", onUp, true);
     });
   }
-  function field({ key, iconName, value, unit = "px", onChange, showUnit = true, sm = false, scrub = true, onDone }) {
+  function field({ key, iconName, value, unit = "px", onChange, showUnit = true, sm = false, scrub = true, onDone, min, max }) {
     const parsed = parseLength(value);
     const hadUnit = /[a-z%]/i.test(String(value != null ? value : ""));
     const input = h("input", { value: parsed.value, type: "text", inputmode: "decimal" });
+    if (min != null) input.setAttribute("min", min);
+    if (max != null) input.setAttribute("max", max);
     const unitEl = showUnit ? h("span", { class: "unit unit-pick", text: hadUnit ? parsed.unit : unit }) : null;
     const commit = () => {
-      const raw = input.value.trim();
+      let raw = input.value.trim();
       if (raw === "") return onChange("");
       const numeric = /^-?[\d.]+$/.test(raw);
+      if (numeric && (min != null || max != null)) {
+        raw = String(clampToInput(input, parseFloat(raw)));
+        input.value = raw;
+      }
       onChange(numeric && showUnit ? raw + ((unitEl == null ? void 0 : unitEl.textContent) || unit) : raw);
     };
     input.addEventListener("change", () => {
@@ -1102,7 +1203,7 @@ ${body}
       if (e.key === "Enter") return input.blur();
       if (e.key === "ArrowUp" || e.key === "ArrowDown") {
         const cur = parseFloat(input.value) || 0;
-        input.value = +(cur + (e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1)).toFixed(2);
+        input.value = clampToInput(input, cur + (e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1));
         commit();
         e.preventDefault();
       }
@@ -1255,7 +1356,7 @@ ${body}
     const swatch = h("div", { class: "cr-swatch" }, [picker]);
     swatch.style.background = value && value !== "rgba(0, 0, 0, 0)" ? value : "transparent";
     const hexInput = h("input", { class: "cr-hex", value: hex.replace("#", "").toUpperCase() });
-    const alphaInput = h("input", { class: "cr-alpha", value: Math.round(alpha * 100) });
+    const alphaInput = h("input", { class: "cr-alpha", value: Math.round(alpha * 100), min: "0", max: "100" });
     const push = (hx) => {
       const out = hexToRgba(hx, alpha);
       swatch.style.background = out;
@@ -1274,7 +1375,9 @@ ${body}
     });
     const alphaUnit = h("span", { class: "cr-unit", text: "%" });
     const commitAlpha = () => {
-      alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
+      const pct = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0));
+      alphaInput.value = pct;
+      alpha = pct / 100;
       push("#" + hexInput.value.trim().replace(/^#/, ""));
     };
     alphaInput.addEventListener("change", commitAlpha);
@@ -1455,12 +1558,12 @@ ${body}
       };
       body.append(section("Layout", [
         labeled("Size", h("div", { class: "size-row" }, [
-          field({ key: "W", value: m.layout.width, onDone: sync, onChange: onW }),
+          field({ key: "W", value: m.layout.width, min: 0, onDone: sync, onChange: onW }),
           linkToggle(linked, () => {
             this._sizeLinked = !linked;
             this.render();
           }),
-          field({ key: "H", value: m.layout.height, onDone: sync, onChange: onH })
+          field({ key: "H", value: m.layout.height, min: 0, onDone: sync, onChange: onH })
         ])),
         labeled("Display", selectField({
           value: m.layout.display,
@@ -1468,15 +1571,15 @@ ${body}
           onChange: on("display")
         })),
         h("div", { class: "row" }, [
-          labeled("Row Gap", field({ iconName: "paragraph-spacing", value: m.layout.rowGap, showUnit: false, sm: true, onChange: onPx("row-gap") })),
-          labeled("Column Gap", field({ iconName: "letter-spacing", value: m.layout.columnGap, showUnit: false, sm: true, onChange: onPx("column-gap") }))
+          labeled("Row Gap", field({ iconName: "paragraph-spacing", value: m.layout.rowGap, showUnit: false, sm: true, min: 0, onChange: onPx("row-gap") })),
+          labeled("Column Gap", field({ iconName: "letter-spacing", value: m.layout.columnGap, showUnit: false, sm: true, min: 0, onChange: onPx("column-gap") }))
         ]),
         h("div", { class: "row" }, [
           labeled("Horizontal Align", selectField({ value: m.layout.justify, options: [["flex-start", "Start"], ["center", "Center"], ["flex-end", "End"], ["space-between", "Between"]], onChange: on("justify-content") })),
           labeled("Vertical Align", selectField({ value: m.layout.align, options: [["flex-start", "Start"], ["center", "Center"], ["flex-end", "End"], ["stretch", "Stretch"]], onChange: on("align-items") }))
         ])
       ]));
-      const axisField = (iconName, aVal, bVal, propA, propB) => {
+      const axisField = (iconName, aVal, bVal, propA, propB, min) => {
         const mixed = aVal !== bVal;
         return field({
           iconName,
@@ -1484,6 +1587,7 @@ ${body}
           showUnit: !mixed,
           scrub: !mixed,
           onDone: sync,
+          min,
           onChange: (v) => {
             onPx(propA)(v);
             onPx(propB)(v);
@@ -1491,9 +1595,10 @@ ${body}
         });
       };
       body.append(section("Spacing", [
+        // Padding can't be negative; margin can.
         labeled("Padding", h("div", { class: "row" }, [
-          axisField("horizontal-resize", m.spacing.padding.left, m.spacing.padding.right, "padding-left", "padding-right"),
-          axisField("vertical-resize", m.spacing.padding.top, m.spacing.padding.bottom, "padding-top", "padding-bottom")
+          axisField("horizontal-resize", m.spacing.padding.left, m.spacing.padding.right, "padding-left", "padding-right", 0),
+          axisField("vertical-resize", m.spacing.padding.top, m.spacing.padding.bottom, "padding-top", "padding-bottom", 0)
         ])),
         labeled("Margin", h("div", { class: "row" }, [
           axisField("horizontal-resize", m.spacing.margin.left, m.spacing.margin.right, "margin-left", "margin-right"),
@@ -1505,9 +1610,9 @@ ${body}
       const cornerExp = !!this._cornerExpanded;
       const cornerMixed = (/* @__PURE__ */ new Set([m.radius.tl, m.radius.tr, m.radius.bl, m.radius.br])).size > 1;
       app.push(h("div", { class: "row" }, [
-        labeled("Opacity", field({ iconName: "transparency", value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: "%", onChange: (v) => on("opacity")((parseFloat(v) || 100) / 100) })),
+        labeled("Opacity", field({ iconName: "transparency", value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: "%", min: 0, max: 100, onChange: (v) => on("opacity")(Math.max(0, Math.min(100, parseFloat(v) || 100)) / 100) })),
         labeled("Corner", h("div", { class: "corner-mix" }, [
-          field({ iconName: "full-screen", value: cornerMixed ? "mix" : m.radius.all, showUnit: false, scrub: !cornerMixed, onDone: sync, onChange: onPx("border-radius") }),
+          field({ iconName: "full-screen", value: cornerMixed ? "mix" : m.radius.all, showUnit: false, scrub: !cornerMixed, min: 0, onDone: sync, onChange: onPx("border-radius") }),
           expandBtn(cornerExp, "full-screen", cornerExp ? "Collapse corners" : "Edit each corner", () => {
             this._cornerExpanded = !cornerExp;
             this.render();
@@ -1521,7 +1626,7 @@ ${body}
           ["border-bottom-left-radius", m.radius.bl],
           ["border-bottom-right-radius", m.radius.br]
         ];
-        app.push(h("div", { class: "corner-grid" }, corners.map(([prop, v]) => field({ iconName: "full-screen", value: v, showUnit: false, onDone: sync, onChange: onPx(prop) }))));
+        app.push(h("div", { class: "corner-grid" }, corners.map(([prop, v]) => field({ iconName: "full-screen", value: v, showUnit: false, min: 0, onDone: sync, onChange: onPx(prop) }))));
       }
       const fills = getFills(el);
       const applyFills = () => {
@@ -1561,6 +1666,7 @@ ${body}
             value: widthMixed ? "mix" : parseFloat(m.border.width) + "",
             showUnit: false,
             scrub: !widthMixed,
+            min: 0,
             onDone: sync,
             onChange: (v) => setProp(el, "border-width", /^-?[\d.]+$/.test(String(v).trim()) ? v + "px" : v)
           }),
@@ -1576,7 +1682,7 @@ ${body}
             ["border-left-width", "stroke-left", sw.left],
             ["border-bottom-width", "stroke-bottom", sw.bottom]
           ];
-          app.push(h("div", { class: "corner-grid" }, sides2.map(([prop, ic, v]) => field({ iconName: ic, value: parseFloat(v) + "", showUnit: false, onDone: sync, onChange: onPx(prop) }))));
+          app.push(h("div", { class: "corner-grid" }, sides2.map(([prop, ic, v]) => field({ iconName: ic, value: parseFloat(v) + "", showUnit: false, min: 0, onDone: sync, onChange: onPx(prop) }))));
         }
       }
       body.append(section("Appearance", app));
@@ -1623,25 +1729,31 @@ ${body}
       swatch.style.background = layerCss(layer);
       const desc = h("span", { class: "cr-hex-text", text: layerLabel(layer) });
       const main = h("div", { class: "cr-main cr-main-btn" }, [swatch, desc]);
-      const alpha = h("input", { class: "cr-alpha", value: Math.round(((_a = layer.alpha) != null ? _a : 1) * 100) });
+      const alpha = h("input", { class: "cr-alpha", value: Math.round(((_a = layer.alpha) != null ? _a : 1) * 100), min: "0", max: "100" });
       const alphaUnit = h("span", { class: "cr-unit", text: "%" });
       const commitAlpha = () => {
+        const pct = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0));
+        alpha.value = pct;
         const cur = getFills(el)[i];
-        cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
+        cur.alpha = pct / 100;
         applyFills();
         swatch.style.background = layerCss(cur);
       };
       alpha.addEventListener("change", commitAlpha);
       attachInputScrub(alpha, commitAlpha);
       attachScrub(alphaUnit, alpha, commitAlpha);
-      main.addEventListener("click", () => openColorPopover(main, getFills(el)[i], (updated) => {
-        var _a2;
-        getFills(el)[i] = updated;
-        applyFills();
-        swatch.style.background = layerCss(updated);
-        desc.textContent = layerLabel(updated);
-        alpha.value = Math.round(((_a2 = updated.alpha) != null ? _a2 : 1) * 100);
-      }));
+      main.addEventListener("click", () => {
+        const cur = getFills(el)[i];
+        const editable = ["solid", "linear", "image"].includes(cur.type) ? cur : defaultLayer("linear");
+        openColorPopover(main, editable, (updated) => {
+          var _a2;
+          getFills(el)[i] = updated;
+          applyFills();
+          swatch.style.background = layerCss(updated);
+          desc.textContent = layerLabel(updated);
+          alpha.value = Math.round(((_a2 = updated.alpha) != null ? _a2 : 1) * 100);
+        });
+      });
       const del = h("button", {
         class: "cr-del",
         title: "Remove fill",
@@ -3205,7 +3317,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.14.1" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.15.0" };
   }
   boot();
 })();
