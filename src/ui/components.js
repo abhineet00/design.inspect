@@ -125,6 +125,25 @@ export function selectField({ value, options, onChange, iconName, key, sm = true
   return field;
 }
 
+/** The light "expand to per-side/per-corner" toggle button (34px in design). */
+export function expandBtn(active, iconName, title, onClick) {
+  return h('button', {
+    class: 'exp-btn' + (active ? ' on' : ''), title,
+    html: icon(iconName), onclick: onClick,
+  });
+}
+
+/** Fill / Stroke sub-header: label on the left, a plus on the right to add it. */
+export function subHead(label, onAdd, { disabled = false } = {}) {
+  return h('div', { class: 'sub-head' }, [
+    h('span', { class: 'sub-label', text: label }),
+    h('button', {
+      class: 'sub-add' + (disabled ? ' off' : ''), title: 'Add ' + label,
+      html: icon('plus'), onclick: disabled ? null : onAdd,
+    }),
+  ]);
+}
+
 /** A row of icon toggle buttons (alignment, flips, text-align). */
 export function iconButtons(buttons, { active = -1, grow = false, seg = false, onPick } = {}) {
   const row = h('div', { class: 'iconrow' + (grow ? ' grow' : '') + (seg ? ' seg' : '') });
@@ -138,6 +157,50 @@ export function iconButtons(buttons, { active = -1, grow = false, seg = false, o
     row.appendChild(btn);
   });
   return row;
+}
+
+/** Small link/unlink toggle that sits between the W and H size fields. */
+export function linkToggle(linked, onToggle) {
+  return h('button', {
+    class: 'link-toggle' + (linked ? ' on' : ''),
+    title: linked ? 'Unlink width & height' : 'Link width & height (keep aspect ratio)',
+    html: icon(linked ? 'link' : 'link-off'),
+    onclick: onToggle,
+  });
+}
+
+/**
+ * A fill/stroke colour row: [swatch + hex] [alpha %] [minus].
+ * Matches the Appearance design — grouped pills with a light delete button.
+ * onChange(rgbaString) fires on colour or alpha edits; onRemove removes the layer.
+ */
+export function colorRow(value, onChange, onRemove) {
+  const parsed = rgbToHex(value);
+  const hex = parsed.hex;
+  let alpha = parsed.alpha == null ? 1 : parsed.alpha;
+
+  const picker = h('input', { type: 'color', value: hex });
+  const swatch = h('div', { class: 'cr-swatch' }, [picker]);
+  swatch.style.background = value && value !== 'rgba(0, 0, 0, 0)' ? value : 'transparent';
+  const hexInput = h('input', { class: 'cr-hex', value: hex.replace('#', '').toUpperCase() });
+  const alphaInput = h('input', { class: 'cr-alpha', value: Math.round(alpha * 100) });
+
+  const push = (hx) => { const out = hexToRgba(hx, alpha); swatch.style.background = out; onChange(out); };
+  picker.addEventListener('input', () => { hexInput.value = picker.value.replace('#', '').toUpperCase(); push(picker.value); });
+  hexInput.addEventListener('change', () => {
+    const v = hexInput.value.trim().replace(/^#/, '');
+    if (/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) { picker.value = '#' + v; push('#' + v); }
+  });
+  alphaInput.addEventListener('change', () => {
+    alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
+    push('#' + hexInput.value.trim().replace(/^#/, ''));
+  });
+
+  return h('div', { class: 'color-row' }, [
+    h('div', { class: 'cr-main' }, [swatch, hexInput]),
+    h('div', { class: 'cr-pct' }, [alphaInput, h('span', { class: 'cr-unit', text: '%' })]),
+    h('button', { class: 'cr-del', title: 'Remove', html: icon('minus-sign'), onclick: onRemove }),
+  ]);
 }
 
 /** Color line: swatch + native picker + hex + percentage. */

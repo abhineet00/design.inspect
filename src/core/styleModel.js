@@ -60,7 +60,15 @@ export function readModel(el) {
     border: {
       width: cs.borderTopWidth,
       style: cs.borderTopStyle,
-      color: cs.borderTopColor,
+      color: val(el, cs, 'border-top-color', 'border-top-color'),
+      sides: {
+        top: cs.borderTopWidth,
+        right: cs.borderRightWidth,
+        bottom: cs.borderBottomWidth,
+        left: cs.borderLeftWidth,
+      },
+      // true when a visible border (non-zero width, drawn style) is present
+      present: parseFloat(cs.borderTopWidth) > 0 && cs.borderTopStyle !== 'none',
     },
     effects: {
       opacity: val(el, cs, 'opacity'),

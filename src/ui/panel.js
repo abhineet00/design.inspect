@@ -11,7 +11,8 @@ import { cssPath } from '../core/selector.js';
 import { record } from '../core/history.js';
 import { icon } from '../icons/index.js';
 import {
-  field, selectField, iconButtons, colorLine, section, labeled, spacingBox,
+  field, selectField, iconButtons, colorRow, section, labeled, spacingBox,
+  linkToggle, expandBtn, subHead,
 } from './components.js';
 
 export class Panel {
@@ -51,7 +52,7 @@ export class Panel {
         h('div', { class: 'head-top' }, [
           h('div', { class: 'head-title', text: meta.title }),
           h('div', { class: 'head-actions' }, [
-            hbtn('minimize-screen', 'Close panel', () => store.set({ collapsed: true })),
+            dockToggleBtn(),
             hbtn('x', 'Close panel', () => store.set({ collapsed: true })),
           ]),
         ]),
@@ -67,7 +68,6 @@ export class Panel {
         h('div', { class: 'head-actions' }, [
           hbtn('delete02', 'Delete this element', () => this._deleteSelected(), 'danger'),
           dockToggleBtn(),
-          hbtn('minimize-screen', 'Close panel', () => store.set({ collapsed: true })),
           hbtn('x', 'Close panel (Exit InspectCSS from the left dock)', () => store.set({ collapsed: true })),
         ]),
       ]),
@@ -113,10 +113,26 @@ export class Panel {
     ]));
 
     // ----- Layout -----
+    // Size fields, with an optional aspect-ratio lock between W and H.
+    const linked = !!this._sizeLinked;
+    const wNum = parseFloat(m.layout.width);
+    const hNum = parseFloat(m.layout.height);
+    const ratio = wNum > 0 && hNum > 0 ? wNum / hNum : 0;
+    const onW = (v) => {
+      setProp(el, 'width', v);
+      const n = parseFloat(v);
+      if (linked && ratio && isFinite(n)) { setProp(el, 'height', Math.round(n / ratio) + 'px'); this.render(); }
+    };
+    const onH = (v) => {
+      setProp(el, 'height', v);
+      const n = parseFloat(v);
+      if (linked && ratio && isFinite(n)) { setProp(el, 'width', Math.round(n * ratio) + 'px'); this.render(); }
+    };
     body.append(section('Layout', [
-      labeled('Size', h('div', { class: 'row' }, [
-        field({ key: 'W', value: m.layout.width, onChange: on('width') }),
-        field({ key: 'H', value: m.layout.height, onChange: on('height') }),
+      labeled('Size', h('div', { class: 'size-row' }, [
+        field({ key: 'W', value: m.layout.width, onChange: onW }),
+        linkToggle(linked, () => { this._sizeLinked = !linked; this.render(); }),
+        field({ key: 'H', value: m.layout.height, onChange: onH }),
       ])),
       labeled('Display', selectField({
         value: m.layout.display,
@@ -147,28 +163,64 @@ export class Panel {
     ]));
 
     // ----- Appearance -----
-    const corners = [
-      { key: 'tl', prop: 'border-top-left-radius', v: m.radius.tl },
-      { key: 'tr', prop: 'border-top-right-radius', v: m.radius.tr },
-      { key: 'bl', prop: 'border-bottom-left-radius', v: m.radius.bl },
-      { key: 'br', prop: 'border-bottom-right-radius', v: m.radius.br },
-    ];
-    const mixed = new Set([m.radius.tl, m.radius.tr, m.radius.bl, m.radius.br]).size > 1;
-    body.append(section('Appearance', [
-      h('div', { class: 'row' }, [
-        labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
-        labeled('Corner', h('div', { class: 'corner-mix' }, [
-          field({ iconName: 'full-screen', value: mixed ? 'mix' : m.radius.all, showUnit: false, onChange: onPx('border-radius') }),
-          iconButtons([{ icon: 'full-screen', title: 'Link corners' }], { onPick: () => onPx('border-radius')(m.radius.tl) }),
-        ])),
-      ]),
-      h('div', { class: 'corner-grid' }, corners.map((c) =>
-        field({ iconName: 'full-screen', value: c.v, showUnit: false, onChange: onPx(c.prop) }))),
-      addRow('Fill', () => { this._fillOpen = !this._fillOpen; this.render(); }),
-      this._fillOpen ? colorLine(m.background.color, on('background-color')) : null,
-      addRow('Stroke', () => { this._strokeOpen = !this._strokeOpen; this.render(); }),
-      this._strokeOpen ? colorLine(m.border.color, on('border-color')) : null,
+    const app = [];
+    const cornerExp = !!this._cornerExpanded;
+    const cornerMixed = new Set([m.radius.tl, m.radius.tr, m.radius.bl, m.radius.br]).size > 1;
+
+    // Opacity + Corner (collapsed value + expand-to-4-corners toggle)
+    app.push(h('div', { class: 'row' }, [
+      labeled('Opacity', field({ iconName: 'transparency', value: String(Math.round((parseFloat(m.effects.opacity) || 1) * 100)), unit: '%', onChange: (v) => on('opacity')((parseFloat(v) || 100) / 100) })),
+      labeled('Corner', h('div', { class: 'corner-mix' }, [
+        field({ iconName: 'full-screen', value: cornerMixed ? 'mix' : m.radius.all, showUnit: false, onChange: onPx('border-radius') }),
+        expandBtn(cornerExp, 'full-screen', cornerExp ? 'Collapse corners' : 'Edit each corner', () => { this._cornerExpanded = !cornerExp; this.render(); }),
+      ])),
     ]));
+    if (cornerExp) {
+      const corners = [
+        ['border-top-left-radius', m.radius.tl], ['border-top-right-radius', m.radius.tr],
+        ['border-bottom-left-radius', m.radius.bl], ['border-bottom-right-radius', m.radius.br],
+      ];
+      app.push(h('div', { class: 'corner-grid' }, corners.map(([prop, v]) =>
+        field({ iconName: 'full-screen', value: v, showUnit: false, onChange: onPx(prop) }))));
+    }
+
+    // Fill (background-color): plus adds, the row's minus removes.
+    const fillOn = hasColor(m.background.color);
+    app.push(subHead('Fill', () => { if (!fillOn) { on('background-color')('#FFFFFF'); this.render(); } }, { disabled: fillOn }));
+    if (fillOn) app.push(colorRow(m.background.color, on('background-color'),
+      () => { on('background-color')('rgba(0, 0, 0, 0)'); this.render(); }));
+
+    // Stroke (border): colour row + width row (single/"mix" + expand-to-4-sides).
+    const strokeOn = m.border.present;
+    app.push(subHead('Stroke', () => {
+      if (!strokeOn) {
+        setProp(el, 'border-style', 'solid');
+        setProp(el, 'border-width', '1px');
+        if (!hasColor(m.border.color)) setProp(el, 'border-color', '#FFFFFF');
+        this.render();
+      }
+    }, { disabled: strokeOn }));
+    if (strokeOn) {
+      app.push(colorRow(m.border.color, on('border-color'),
+        () => { setProp(el, 'border-width', '0px'); this.render(); }));
+      const sw = m.border.sides;
+      const widthMixed = new Set([sw.top, sw.right, sw.bottom, sw.left]).size > 1;
+      const strokeExp = !!this._strokeSidesExpanded;
+      app.push(h('div', { class: 'corner-mix' }, [
+        field({ iconName: 'square', value: widthMixed ? 'mix' : parseFloat(m.border.width) + '', showUnit: false,
+          onChange: (v) => setProp(el, 'border-width', /^-?[\d.]+$/.test(String(v).trim()) ? v + 'px' : v) }),
+        expandBtn(strokeExp, 'border-all-01', strokeExp ? 'Collapse sides' : 'Edit each side', () => { this._strokeSidesExpanded = !strokeExp; this.render(); }),
+      ]));
+      if (strokeExp) {
+        const sides = [
+          ['border-top-width', 'stroke-top', sw.top], ['border-right-width', 'stroke-right', sw.right],
+          ['border-left-width', 'stroke-left', sw.left], ['border-bottom-width', 'stroke-bottom', sw.bottom],
+        ];
+        app.push(h('div', { class: 'corner-grid' }, sides.map(([prop, ic, v]) =>
+          field({ iconName: ic, value: parseFloat(v) + '', showUnit: false, onChange: onPx(prop) }))));
+      }
+    }
+    body.append(section('Appearance', app));
 
     // ----- Typography -----
     body.append(section('Typography', [
@@ -424,24 +476,23 @@ export class Panel {
 function hbtn(name, title, onClick, extra = '') {
   return h('button', { class: 'hbtn' + (extra ? ' ' + extra : ''), title, onclick: onClick, html: icon(name) });
 }
-const SIDEBAR_ICON =
-  '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-  'stroke-width="1.6"><rect x="3" y="4" width="18" height="16" rx="3"/>' +
-  '<path d="M15 4v16" stroke-linecap="round"/><path d="M18 9l-1.5 3 1.5 3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function dockToggleBtn() {
   const docked = store.get().docked;
   return h('button', {
     class: 'hbtn' + (docked ? ' active' : ''),
     title: docked ? 'Undock panel (float)' : 'Dock panel to the side',
     onclick: () => store.set({ docked: !store.get().docked }),
-    html: SIDEBAR_ICON,
+    html: icon('sidebar-right-01'),
   });
 }
-function addRow(label, onAdd) {
-  return h('div', { class: 'addrow' }, [
-    h('span', { class: 'k', text: label }),
-    h('button', { class: 'addbtn', title: 'Add ' + label, html: icon('plus'), onclick: onAdd }),
-  ]);
+// A colour counts as "present" when it isn't fully transparent.
+function hasColor(c) {
+  if (!c) return false;
+  const s = String(c).trim();
+  if (s === 'transparent' || s === 'none') return false;
+  const m = s.match(/rgba?\(([^)]+)\)/i);
+  if (m) { const a = m[1].split(',')[3]; return a == null || parseFloat(a) > 0; }
+  return true;
 }
 function assetSection(title, count, content) {
   const head = h('div', { class: 'sec-head' }, [

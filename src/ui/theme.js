@@ -166,18 +166,55 @@ ${fontFace}
 }
 .sp-edge:focus { color: var(--blue); }
 
-/* ---------- Corner grid (Appearance) ---------- */
-.corner-mix { display: grid; grid-template-columns: 1fr 28px; gap: 4px; }
-.corner-mix .ibtn { height: 28px; background: var(--field-active); }
-.corner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
-.corner-grid .field { background: var(--field-2); }
+/* ---------- Size row (W · link · H) ---------- */
+.size-row { display: flex; align-items: center; gap: 4px; }
+.size-row .field { flex: 1; }
+.link-toggle {
+  width: 22px; height: 22px; flex: none; padding: 0; border: none; border-radius: 6px;
+  background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center;
+}
+.link-toggle:hover, .link-toggle.on { color: var(--text); }
+.link-toggle svg { width: 16px; height: 16px; }
 
-/* ---------- Fill / stroke add rows ---------- */
-.addrow { display: flex; align-items: center; justify-content: space-between; height: 17px; }
-.addrow .k { color: var(--muted); font-size: 12.5px; font-weight: 500; }
-.addbtn { width: 17px; height: 17px; display: grid; place-items: center; background: transparent; border: none; color: var(--text); cursor: pointer; padding: 0; }
-.addbtn:hover { color: var(--blue); }
-.addbtn svg { width: 17px; height: 17px; }
+/* ---------- Corner / stroke expand grids (Appearance) ---------- */
+.corner-mix { display: grid; grid-template-columns: 1fr 28px; gap: 4px; }
+.corner-mix .field { border-radius: 10px 7px 7px 10px; }
+.corner-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.corner-grid .field { background: var(--field-2); }
+.exp-btn {
+  height: 28px; min-width: 28px; display: grid; place-items: center; padding: 0;
+  background: var(--field); border: none; border-radius: 7px 10px 10px 7px;
+  color: var(--text); cursor: pointer;
+}
+.exp-btn:hover { background: var(--field-2); }
+.exp-btn.on { background: #dbdbdb; color: #151515; }
+.exp-btn svg { width: 14px; height: 14px; }
+
+/* ---------- Fill / stroke ---------- */
+.sub-head { display: flex; align-items: center; justify-content: space-between; height: 16px; }
+.sub-label { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.sub-add { width: 16px; height: 16px; display: grid; place-items: center; background: transparent; border: none; color: var(--text); cursor: pointer; padding: 0; }
+.sub-add:hover { color: var(--blue); }
+.sub-add.off { opacity: .35; cursor: default; }
+.sub-add svg { width: 16px; height: 16px; }
+
+.color-row { display: flex; align-items: stretch; gap: 4px; }
+.cr-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 7px; height: 32px;
+  background: var(--field); border: 1px solid transparent; border-radius: 12px 8px 8px 12px; padding: 7px;
+}
+.cr-main:focus-within, .cr-pct:focus-within { border-color: var(--blue); }
+.cr-swatch { width: 16px; height: 16px; border-radius: 6px; border: 1px solid rgba(255,255,255,.18); position: relative; overflow: hidden; flex: none; cursor: pointer; }
+.cr-swatch input[type=color] { position: absolute; inset: -4px; width: 140%; height: 140%; border: none; padding: 0; cursor: pointer; }
+.cr-hex { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-transform: uppercase; }
+.cr-pct { display: flex; align-items: center; gap: 3px; height: 32px; background: var(--field); border: 1px solid transparent; border-radius: 8px; padding: 7px; flex: none; }
+.cr-alpha { width: 26px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-align: right; }
+.cr-unit { color: var(--muted); font-size: 14px; font-weight: 400; flex: none; }
+.cr-del { width: 30px; flex: none; display: grid; place-items: center; background: var(--field); border: none; border-radius: 8px 12px 12px 8px; color: var(--text); cursor: pointer; }
+.cr-del:hover { color: #e05151; }
+.cr-del svg { width: 14px; height: 14px; }
+
+/* legacy single colour line (kept for compatibility) */
 .colorline { display: flex; align-items: center; gap: 7px; background: var(--field); border-radius: var(--r-field); padding: 7px; height: 32px; }
 .swatch { width: 18px; height: 18px; border-radius: 5px; border: 1px solid rgba(255,255,255,.18); position: relative; overflow: hidden; flex: none; cursor: pointer; }
 .swatch input[type=color] { position: absolute; inset: -4px; width: 140%; height: 140%; border: none; padding: 0; cursor: pointer; }
