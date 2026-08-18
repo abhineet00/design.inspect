@@ -1272,15 +1272,17 @@ ${body}
         push("#" + v);
       }
     });
+    const alphaUnit = h("span", { class: "cr-unit", text: "%" });
     const commitAlpha = () => {
       alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
       push("#" + hexInput.value.trim().replace(/^#/, ""));
     };
     alphaInput.addEventListener("change", commitAlpha);
     attachInputScrub(alphaInput, commitAlpha);
+    attachScrub(alphaUnit, alphaInput, commitAlpha);
     return h("div", { class: "color-row" }, [
       h("div", { class: "cr-main" }, [swatch, hexInput]),
-      h("div", { class: "cr-pct" }, [alphaInput, h("span", { class: "cr-unit", text: "%" })]),
+      h("div", { class: "cr-pct" }, [alphaInput, alphaUnit]),
       h("button", { class: "cr-del", title: "Remove", html: icon("minus-sign"), onclick: onRemove })
     ]);
   }
@@ -1622,6 +1624,7 @@ ${body}
       const desc = h("span", { class: "cr-hex-text", text: layerLabel(layer) });
       const main = h("div", { class: "cr-main cr-main-btn" }, [swatch, desc]);
       const alpha = h("input", { class: "cr-alpha", value: Math.round(((_a = layer.alpha) != null ? _a : 1) * 100) });
+      const alphaUnit = h("span", { class: "cr-unit", text: "%" });
       const commitAlpha = () => {
         const cur = getFills(el)[i];
         cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
@@ -1630,6 +1633,7 @@ ${body}
       };
       alpha.addEventListener("change", commitAlpha);
       attachInputScrub(alpha, commitAlpha);
+      attachScrub(alphaUnit, alpha, commitAlpha);
       main.addEventListener("click", () => openColorPopover(main, getFills(el)[i], (updated) => {
         var _a2;
         getFills(el)[i] = updated;
@@ -1649,7 +1653,7 @@ ${body}
         }
       });
       const parts = [main];
-      if (layer.type === "solid") parts.push(h("div", { class: "cr-pct" }, [alpha, h("span", { class: "cr-unit", text: "%" })]));
+      if (layer.type === "solid") parts.push(h("div", { class: "cr-pct" }, [alpha, alphaUnit]));
       parts.push(del);
       return h("div", { class: "color-row" }, parts);
     }
@@ -2804,8 +2808,12 @@ ${fontFace}
 .cr-swatch input[type=color] { position: absolute; inset: -4px; width: 140%; height: 140%; border: none; padding: 0; cursor: pointer; }
 .cr-hex { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-transform: uppercase; }
 .cr-pct { display: flex; align-items: center; gap: 3px; height: 32px; background: var(--field); border: 1px solid transparent; border-radius: 8px 12px 12px 8px; padding: 7px; flex: none; }
-.cr-alpha { width: 26px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-align: right; }
+.cr-alpha { width: 26px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-align: right; cursor: ew-resize; }
+.cr-alpha:focus { cursor: text; }
 .cr-unit { color: var(--muted); font-size: 14px; font-weight: 400; flex: none; }
+.cr-unit.scrub { cursor: ew-resize; }
+/* the whole opacity chip reads as a drag target */
+.cr-pct { cursor: ew-resize; }
 .cr-del { width: 30px; flex: none; display: grid; place-items: center; background: var(--field); border: none; border-radius: 8px 12px 12px 8px; color: var(--text); cursor: pointer; }
 .cr-del:hover { color: #e05151; }
 .cr-del svg { width: 14px; height: 14px; }
@@ -3197,7 +3205,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.14.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.14.1" };
   }
   boot();
 })();

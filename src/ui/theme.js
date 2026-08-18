@@ -231,8 +231,12 @@ ${fontFace}
 .cr-swatch input[type=color] { position: absolute; inset: -4px; width: 140%; height: 140%; border: none; padding: 0; cursor: pointer; }
 .cr-hex { flex: 1; min-width: 0; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-transform: uppercase; }
 .cr-pct { display: flex; align-items: center; gap: 3px; height: 32px; background: var(--field); border: 1px solid transparent; border-radius: 8px 12px 12px 8px; padding: 7px; flex: none; }
-.cr-alpha { width: 26px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-align: right; }
+.cr-alpha { width: 26px; background: transparent; border: none; outline: none; color: var(--text); font-size: 14px; font-weight: 500; font-family: var(--font); text-align: right; cursor: ew-resize; }
+.cr-alpha:focus { cursor: text; }
 .cr-unit { color: var(--muted); font-size: 14px; font-weight: 400; flex: none; }
+.cr-unit.scrub { cursor: ew-resize; }
+/* the whole opacity chip reads as a drag target */
+.cr-pct { cursor: ew-resize; }
 .cr-del { width: 30px; flex: none; display: grid; place-items: center; background: var(--field); border: none; border-radius: 8px 12px 12px 8px; color: var(--text); cursor: pointer; }
 .cr-del:hover { color: #e05151; }
 .cr-del svg { width: 14px; height: 14px; }

@@ -189,7 +189,7 @@ class App {
 function boot() {
   if (window.InspectCSS) { window.InspectCSS.destroy(); return; }
   const app = new App();
-  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.14.0' };
+  window.InspectCSS = { app, destroy: () => app.destroy(), version: '0.14.1' };
 }
 
 boot();

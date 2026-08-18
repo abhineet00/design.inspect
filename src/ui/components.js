@@ -249,16 +249,18 @@ export function colorRow(value, onChange, onRemove) {
     const v = hexInput.value.trim().replace(/^#/, '');
     if (/^([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v)) { picker.value = '#' + v; push('#' + v); }
   });
+  const alphaUnit = h('span', { class: 'cr-unit', text: '%' });
   const commitAlpha = () => {
     alpha = Math.max(0, Math.min(100, parseFloat(alphaInput.value) || 0)) / 100;
     push('#' + hexInput.value.trim().replace(/^#/, ''));
   };
   alphaInput.addEventListener('change', commitAlpha);
-  attachInputScrub(alphaInput, commitAlpha); // drag the % to scrub opacity
+  attachInputScrub(alphaInput, commitAlpha);       // drag the number itself
+  attachScrub(alphaUnit, alphaInput, commitAlpha); // …or drag the % as a handle
 
   return h('div', { class: 'color-row' }, [
     h('div', { class: 'cr-main' }, [swatch, hexInput]),
-    h('div', { class: 'cr-pct' }, [alphaInput, h('span', { class: 'cr-unit', text: '%' })]),
+    h('div', { class: 'cr-pct' }, [alphaInput, alphaUnit]),
     h('button', { class: 'cr-del', title: 'Remove', html: icon('minus-sign'), onclick: onRemove }),
   ]);
 }

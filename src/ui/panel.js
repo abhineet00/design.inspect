@@ -14,7 +14,7 @@ import { openColorPopover, closeColorPopover } from './colorPopover.js';
 import { icon } from '../icons/index.js';
 import {
   field, selectField, iconButtons, colorRow, section, labeled, spacingBox,
-  linkToggle, expandBtn, subHead, attachInputScrub,
+  linkToggle, expandBtn, subHead, attachInputScrub, attachScrub,
 } from './components.js';
 
 export class Panel {
@@ -291,12 +291,14 @@ export class Panel {
     const main = h('div', { class: 'cr-main cr-main-btn' }, [swatch, desc]);
 
     const alpha = h('input', { class: 'cr-alpha', value: Math.round((layer.alpha ?? 1) * 100) });
+    const alphaUnit = h('span', { class: 'cr-unit', text: '%' });
     const commitAlpha = () => {
       const cur = getFills(el)[i]; cur.alpha = Math.max(0, Math.min(100, parseFloat(alpha.value) || 0)) / 100;
       applyFills(); swatch.style.background = layerCss(cur);
     };
     alpha.addEventListener('change', commitAlpha);
-    attachInputScrub(alpha, commitAlpha); // drag the % to scrub opacity
+    attachInputScrub(alpha, commitAlpha);      // drag the number itself
+    attachScrub(alphaUnit, alpha, commitAlpha); // …or drag the % as a handle
 
     main.addEventListener('click', () => openColorPopover(main, getFills(el)[i], (updated) => {
       getFills(el)[i] = updated;
@@ -310,7 +312,7 @@ export class Panel {
       onclick: () => { getFills(el).splice(i, 1); applyFills(); this.render(); } });
 
     const parts = [main];
-    if (layer.type === 'solid') parts.push(h('div', { class: 'cr-pct' }, [alpha, h('span', { class: 'cr-unit', text: '%' })]));
+    if (layer.type === 'solid') parts.push(h('div', { class: 'cr-pct' }, [alpha, alphaUnit]));
     parts.push(del);
     return h('div', { class: 'color-row' }, parts);
   }
