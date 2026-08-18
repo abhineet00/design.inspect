@@ -40,10 +40,10 @@ export class Panel {
     const body = h('div', { class: 'panel-body' });
     if (st.view === 'assets') this._assets(body);
     else if (st.view === 'changes') this._changes(body);
+    else if (st.view === 'html') this._html(body);
     else if (!this.selected) {
       body.append(h('div', { class: 'empty', text: 'Pick an element on the page to inspect and edit its styles.' }));
-    } else if (st.view === 'html') this._html(body);
-    else this._design(body);
+    } else this._design(body);
     this.el.append(body);
     body.scrollTop = prevScroll;
   }
@@ -58,31 +58,37 @@ export class Panel {
         : { title: 'Changes', sub: 'Every edit you make, ready to copy' };
       return h('div', { class: 'head' }, [
         h('div', { class: 'head-top' }, [
-          h('div', { class: 'head-title', text: meta.title }),
+          h('div', { class: 'head-id' }, [
+            h('div', { class: 'head-title', text: meta.title }),
+            h('div', { class: 'crumb', style: { color: 'var(--muted)' }, text: meta.sub }),
+          ]),
           h('div', { class: 'head-actions' }, [
             dockToggleBtn(),
             hbtn('x', 'Close panel', () => store.set({ collapsed: true })),
           ]),
         ]),
-        h('div', { class: 'crumb', style: { color: 'var(--muted)' }, text: meta.sub }),
       ]);
     }
     const el = this.selected;
     const m = el ? readModel(el) : null;
     const crumb = el ? classChain(el) : [];
+    // Card info: element name (blue) + class breadcrumb (orange) stacked on the
+    // left, action icons top-right, then the dimensions line below.
     return h('div', { class: 'head' }, [
       h('div', { class: 'head-top' }, [
-        h('div', { class: 'head-title', text: el ? elementLabel(el) || m.tag : 'InspectCSS' }),
+        h('div', { class: 'head-id' }, [
+          h('div', { class: 'head-title', text: el ? elementLabel(el) || m.tag : 'InspectCSS' }),
+          el && crumb.length ? h('div', { class: 'crumb' }, crumb.map((c) => h('span', { text: c }))) : null,
+        ]),
         h('div', { class: 'head-actions' }, [
-          hbtn('delete02', 'Delete this element', () => this._deleteSelected(), 'danger'),
+          el ? hbtn('delete02', 'Delete this element', () => this._deleteSelected(), 'danger') : null,
           dockToggleBtn(),
           hbtn('x', 'Close panel (Exit InspectCSS from the left dock)', () => store.set({ collapsed: true })),
         ]),
       ]),
-      el ? h('div', { class: 'crumb' }, crumb.map((c) => h('span', { text: c }))) : null,
       el ? h('div', { class: 'dims' }, [
-        h('span', { html: `<b>${round(m.rect.width)}</b> x <b>${round(m.rect.height)}</b> px` }),
-        h('span', { html: `A <b>${parseInt(m.typography.fontSize)}px</b>` }),
+        h('span', {}, [h('b', { text: `${round(m.rect.width)} x ${round(m.rect.height)} ` }), h('span', { class: 'mut', text: 'px' })]),
+        h('span', {}, [h('span', { class: 'mut', text: 'A ' }), h('b', { text: `${parseInt(m.typography.fontSize)}` }), h('span', { class: 'mut', text: 'px' })]),
       ]) : h('div', { class: 'crumb', text: 'no selection' }),
     ]);
   }
@@ -121,7 +127,7 @@ export class Panel {
         iconButtons([
           { icon: 'image-flip-horizontal', title: 'Flip horizontal', axis: 'x' },
           { icon: 'image-flip-vertical', title: 'Flip vertical', axis: 'y' },
-        ], { grow: true, onPick: (b) => flip(el, b.axis) }),
+        ], { grow: true, seg: true, onPick: (b) => flip(el, b.axis) }),
       ])),
     ]));
 
@@ -258,6 +264,9 @@ export class Panel {
           { icon: 'text-align-justify', title: 'Justify', css: 'justify' },
         ], { grow: true, seg: true, active: ['right', 'center', 'left', 'justify'].indexOf(m.typography.textAlign), onPick: (b) => on('text-align')(b.css) })),
       ]),
+      // Text colour — a Fill sub-section, mirroring Appearance's Fill.
+      subHead('Fill', () => { on('color')('#FFFFFF'); this.render(); }),
+      colorRow(m.typography.color, on('color'), () => { setProp(el, 'color', 'inherit'); this.render(); }),
     ]));
   }
 
