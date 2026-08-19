@@ -6,6 +6,7 @@ import { ensureInspectId, inspectIdSelector, elementLabel } from './util.js';
 import { cssPath } from './selector.js';
 import { logChange } from './changeLog.js';
 import { record } from './history.js';
+import { googleImportsFor } from './fonts.js';
 
 const STYLE_ID = 'inspect-css-live-styles';
 
@@ -104,7 +105,11 @@ export function generateCss() {
       .join('\n');
     out.push(`${sel} {\n${body}\n}`);
   }
-  return out.join('\n\n');
+  const css = out.join('\n\n');
+  // Prepend @import lines for any Google font used, so the copied CSS is
+  // self-contained when pasted into another project.
+  const imports = googleImportsFor(css);
+  return imports.length ? imports.join('\n') + '\n\n' + css : css;
 }
 
 export function clearAll() {

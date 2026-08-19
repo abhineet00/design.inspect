@@ -423,6 +423,27 @@ ${fontFace}
 .dropdown-item.active { color: var(--blue); }
 .dropdown-check { width: 14px; height: 14px; display: grid; place-items: center; flex: none; }
 
+/* ---------- Font picker (searchable) ---------- */
+.dropdown-menu.font-menu { padding: 0; max-height: 340px; overflow: hidden; display: flex; flex-direction: column; width: 240px; }
+.font-search {
+  margin: 6px; padding: 8px 10px; border-radius: 8px; flex: none;
+  background: var(--field); border: 1px solid var(--tool-border); color: var(--text);
+  font-family: var(--font); font-size: 13.5px; font-weight: 500; outline: none;
+}
+.font-search:focus { border-color: var(--blue); }
+.font-search::placeholder { color: var(--muted); }
+.font-list { overflow-y: auto; padding: 0 5px 5px; }
+.font-list::-webkit-scrollbar { width: 8px; }
+.font-list::-webkit-scrollbar-thumb { background: var(--field-2); border-radius: 8px; }
+.font-group {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted); padding: 9px 9px 4px;
+}
+.font-item .font-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 15px; line-height: 1.2;
+}
+
 /* ---------- Custom tooltip ---------- */
 .tooltip {
   position: fixed; z-index: 2147483647; pointer-events: none;

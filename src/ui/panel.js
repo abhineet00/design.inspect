@@ -13,9 +13,10 @@ import { getFills, compose, layerCss, layerLabel, defaultLayer } from '../core/f
 import { openColorPopover, closeColorPopover } from './colorPopover.js';
 import { icon } from '../icons/index.js';
 import {
-  field, selectField, iconButtons, colorRow, section, labeled, spacingBox,
+  field, selectField, fontField, iconButtons, colorRow, section, labeled, spacingBox,
   linkToggle, expandBtn, subHead, attachInputScrub, attachScrub,
 } from './components.js';
+import { fontStack, ensureGoogleFont } from '../core/fonts.js';
 
 export class Panel {
   constructor(root, api = {}) {
@@ -256,9 +257,8 @@ export class Panel {
 
     // ----- Typography -----
     body.append(section('Typography', [
-      labeled('Typeface', selectField({ value: firstFont(m.typography.fontFamily),
-        options: [firstFont(m.typography.fontFamily), 'Quicksand', 'Inter', 'Arial', 'Georgia', 'system-ui', 'monospace'],
-        onChange: on('font-family') })),
+      labeled('Typeface', fontField({ value: firstFont(m.typography.fontFamily),
+        onChange: (name) => { ensureGoogleFont(name); on('font-family')(fontStack(name)); } })),
       h('div', { class: 'row' }, [
         selectField({ value: weightName(m.typography.fontWeight), options: [['300', 'Light'], ['400', 'Regular'], ['500', 'Medium'], ['600', 'SemiBold'], ['700', 'Bold'], ['800', 'Extra']], onChange: on('font-weight') }),
         selectField({ value: parseInt(m.typography.fontSize) + '', options: ['10', '12', '13', '14', '16', '18', '20', '24', '32', '48'].map((x) => [x, x]), onChange: (v) => on('font-size')(v + 'px') }),

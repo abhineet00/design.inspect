@@ -25,7 +25,10 @@ that usually sits behind a paywall.
   - Position / size / rotation (`X`, `Y`, `∠`, `W`, `H`, radius)
   - `display` / `position`
   - Margin & padding via a visual box editor
-  - Typography (size, weight, line-height, letter-spacing, align, color)
+  - Typography (font family, size, weight, line-height, letter-spacing, align, color)
+    with a searchable picker: system/web-safe fonts (offline) plus curated
+    Google Fonts that load on demand; used Google fonts are added as an
+    `@import` in the copied CSS
   - Fill & border (background, border color/width/style)
   - Effects (opacity, box-shadow)
 - **Pseudo states** — edit `:hover`, `:focus`, `:active` variants.
@@ -121,7 +124,7 @@ selector derived from the element's real ids/classes.
 Loading the bundle exposes a small global:
 
 ```js
-window.InspectCSS.version    // "0.15.0"
+window.InspectCSS.version    // "0.16.0"
 window.InspectCSS.destroy()  // remove the editor and all injected styles
 window.InspectCSS.app.select(element)  // select an element programmatically
 ```

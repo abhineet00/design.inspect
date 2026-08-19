@@ -3,6 +3,7 @@
 
 import { h, parseLength, rgbToHex, hexToRgba } from '../core/util.js';
 import { icon } from '../icons/index.js';
+import { SYSTEM_FONTS, GOOGLE_FONTS, previewStack, loadFontPreviews } from '../core/fonts.js';
 
 function ico(name) {
   return h('span', { class: 'fic', html: icon(name) });
@@ -192,6 +193,96 @@ export function selectField({ value, options, onChange, iconName, key, sm = true
   field.addEventListener('mousedown', (e) => { e.preventDefault(); open(); });
   field.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
   return field;
+}
+
+/** A searchable font-family picker: system fonts (offline) + curated Google
+ *  fonts, each row previewed in its own face. `onChange(name)` gets the chosen
+ *  font's display name; the caller resolves it to a full stack and loads it. */
+export function fontField({ value, onChange }) {
+  const valueEl = h('span', { class: 'sel-value', text: value || 'System UI' });
+  const field = h('div', { class: 'field select-like sm font-field', tabindex: '0' }, [
+    valueEl, chevMini(),
+  ]);
+  const open = () => openFontMenu(field, valueEl.textContent, (name) => {
+    valueEl.textContent = name;
+    onChange(name);
+  });
+  field.addEventListener('mousedown', (e) => { e.preventDefault(); open(); });
+  field.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  return field;
+}
+
+function openFontMenu(anchor, current, onPick) {
+  if (openMenuState && openMenuState.anchor === anchor) return closeMenu();
+  closeMenu();
+  loadFontPreviews();
+  const root = anchor.getRootNode();
+  const wrap = (root.querySelector && root.querySelector('.wrap')) || document.body;
+
+  const search = h('input', { class: 'font-search', type: 'text', placeholder: 'Search fonts…', spellcheck: 'false' });
+  const list = h('div', { class: 'font-list' });
+  const groups = [
+    ['System', SYSTEM_FONTS.map((s) => s.name)],
+    ['Google Fonts', GOOGLE_FONTS.map((g) => g.name)],
+  ];
+  const rows = []; // { el, name, label(lowercase), header }
+  for (const [title, names] of groups) {
+    const header = h('div', { class: 'font-group' }, [h('span', { text: title })]);
+    list.appendChild(header);
+    const groupRows = [];
+    for (const name of names) {
+      const active = name === current;
+      const item = h('div', { class: 'dropdown-item font-item' + (active ? ' active' : '') }, [
+        h('span', { class: 'font-name', text: name, style: `font-family:${previewStack(name)}` }),
+        active ? h('span', { class: 'dropdown-check', html: CHECK_SVG }) : null,
+      ]);
+      item.addEventListener('mousedown', (e) => { e.preventDefault(); e.stopPropagation(); onPick(name); closeMenu(); });
+      list.appendChild(item);
+      const row = { el: item, name, label: name.toLowerCase(), header };
+      rows.push(row); groupRows.push(row);
+    }
+    header._rows = groupRows;
+  }
+
+  const menu = h('div', { class: 'dropdown-menu font-menu', 'data-inspect-ui': '' }, [search, list]);
+  wrap.appendChild(menu);
+
+  const r = anchor.getBoundingClientRect();
+  menu.style.left = Math.round(r.left) + 'px';
+  menu.style.top = Math.round(r.bottom + 4) + 'px';
+  menu.style.minWidth = Math.max(210, Math.round(r.width)) + 'px';
+  const mr = menu.getBoundingClientRect();
+  if (mr.bottom > window.innerHeight - 8) menu.style.top = Math.max(8, Math.round(r.top - mr.height - 4)) + 'px';
+  const activeItem = menu.querySelector('.font-item.active');
+  if (activeItem) activeItem.scrollIntoView({ block: 'center' });
+
+  const filter = () => {
+    const q = search.value.trim().toLowerCase();
+    for (const row of rows) row.el.style.display = (!q || row.label.includes(q)) ? '' : 'none';
+    // hide a group header when its whole group is filtered out
+    for (const header of list.querySelectorAll('.font-group')) {
+      const any = header._rows.some((row) => row.el.style.display !== 'none');
+      header.style.display = any ? '' : 'none';
+    }
+  };
+  search.addEventListener('input', filter);
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const first = rows.find((row) => row.el.style.display !== 'none');
+      if (first) { onPick(first.name); closeMenu(); }
+    }
+  });
+
+  anchor.classList.add('open');
+  const onDoc = (e) => { if (!e.composedPath().includes(menu) && !e.composedPath().includes(anchor)) closeMenu(); };
+  const onKey = (e) => { if (e.key === 'Escape') closeMenu(); };
+  setTimeout(() => {
+    document.addEventListener('mousedown', onDoc, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('scroll', onDoc, true);
+    search.focus();
+  }, 0);
+  openMenuState = { menu, anchor, onDoc, onKey };
 }
 
 /** The light "expand to per-side/per-corner" toggle button (34px in design). */

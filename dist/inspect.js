@@ -435,6 +435,125 @@
     return a;
   }
 
+  // src/core/fonts.js
+  var SYSTEM_FONTS = [
+    { name: "System UI", stack: `system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif` },
+    { name: "Sans Serif", stack: `-apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif` },
+    { name: "Serif", stack: `Georgia, 'Times New Roman', Times, serif` },
+    { name: "Monospace", stack: `ui-monospace, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace` },
+    { name: "Arial", stack: `Arial, Helvetica, sans-serif` },
+    { name: "Georgia", stack: `Georgia, serif` },
+    { name: "Times New Roman", stack: `'Times New Roman', Times, serif` },
+    { name: "Courier New", stack: `'Courier New', Courier, monospace` },
+    { name: "Verdana", stack: `Verdana, Geneva, sans-serif` },
+    { name: "Trebuchet MS", stack: `'Trebuchet MS', Helvetica, sans-serif` }
+  ];
+  var G = (name, cat = "sans-serif") => ({ name, cat });
+  var GOOGLE_FONTS = [
+    G("Inter"),
+    G("Roboto"),
+    G("Open Sans"),
+    G("Lato"),
+    G("Montserrat"),
+    G("Poppins"),
+    G("Raleway"),
+    G("Nunito"),
+    G("Work Sans"),
+    G("Rubik"),
+    G("DM Sans"),
+    G("Manrope"),
+    G("Mulish"),
+    G("Quicksand"),
+    G("Josefin Sans"),
+    G("Karla"),
+    G("Figtree"),
+    G("Outfit"),
+    G("Space Grotesk"),
+    G("Oswald"),
+    G("Archivo"),
+    G("Playfair Display", "serif"),
+    G("Merriweather", "serif"),
+    G("Lora", "serif"),
+    G("PT Serif", "serif"),
+    G("Roboto Slab", "serif"),
+    G("Bitter", "serif"),
+    G("Cormorant Garamond", "serif"),
+    G("Libre Baskerville", "serif"),
+    G("EB Garamond", "serif"),
+    G("Bebas Neue"),
+    G("Anton"),
+    G("Abril Fatface", "serif"),
+    G("Roboto Mono", "monospace"),
+    G("Space Mono", "monospace"),
+    G("JetBrains Mono", "monospace"),
+    G("IBM Plex Mono", "monospace"),
+    G("Fira Code", "monospace"),
+    G("Source Code Pro", "monospace"),
+    G("Dancing Script", "cursive"),
+    G("Caveat", "cursive"),
+    G("Pacifico", "cursive"),
+    G("Lobster", "cursive"),
+    G("Sacramento", "cursive")
+  ];
+  var googleByName = new Map(GOOGLE_FONTS.map((f) => [f.name, f]));
+  function isGoogle(name) {
+    return googleByName.has(name);
+  }
+  function fontStack(name) {
+    const sys = SYSTEM_FONTS.find((s) => s.name === name);
+    if (sys) return sys.stack;
+    const g = googleByName.get(name);
+    if (g) return `'${g.name}', ${g.cat}`;
+    return name;
+  }
+  function previewStack(name) {
+    return fontStack(name);
+  }
+  function famParam(name) {
+    return "family=" + name.trim().replace(/\s+/g, "+");
+  }
+  function slug(s) {
+    return s.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  }
+  function addLink(href, id) {
+    if (document.getElementById(id)) return;
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = href;
+    link.id = id;
+    link.setAttribute("data-inspect-ui", "");
+    document.head.appendChild(link);
+  }
+  var loadedFull = /* @__PURE__ */ new Set();
+  function ensureGoogleFont(name) {
+    if (!isGoogle(name) || loadedFull.has(name)) return;
+    loadedFull.add(name);
+    addLink(
+      `https://fonts.googleapis.com/css2?${famParam(name)}:wght@300;400;500;600;700&display=swap`,
+      "inspect-font-" + slug(name)
+    );
+  }
+  var previewLoaded = false;
+  function loadFontPreviews() {
+    if (previewLoaded) return;
+    previewLoaded = true;
+    const fams = GOOGLE_FONTS.map((f) => famParam(f.name)).join("&");
+    const chars = [...new Set(GOOGLE_FONTS.map((f) => f.name).join("").split(""))].join("");
+    addLink(
+      `https://fonts.googleapis.com/css2?${fams}&text=${encodeURIComponent(chars)}&display=swap`,
+      "inspect-font-previews"
+    );
+  }
+  function googleImportsFor(cssText) {
+    const out = [];
+    for (const f of GOOGLE_FONTS) {
+      if (cssText.includes(`'${f.name}'`) || cssText.includes(`"${f.name}"`)) {
+        out.push(`@import url('https://fonts.googleapis.com/css2?${famParam(f.name)}:wght@300;400;500;600;700&display=swap');`);
+      }
+    }
+    return out;
+  }
+
   // src/core/liveStyles.js
   var STYLE_ID = "inspect-css-live-styles";
   function styleEl() {
@@ -524,7 +643,9 @@ ${body}
 ${body}
 }`);
     }
-    return out.join("\n\n");
+    const css2 = out.join("\n\n");
+    const imports = googleImportsFor(css2);
+    return imports.length ? imports.join("\n") + "\n\n" + css2 : css2;
   }
 
   // src/core/styleModel.js
@@ -1308,6 +1429,107 @@ ${body}
     });
     return field2;
   }
+  function fontField({ value, onChange }) {
+    const valueEl = h("span", { class: "sel-value", text: value || "System UI" });
+    const field2 = h("div", { class: "field select-like sm font-field", tabindex: "0" }, [
+      valueEl,
+      chevMini()
+    ]);
+    const open = () => openFontMenu(field2, valueEl.textContent, (name) => {
+      valueEl.textContent = name;
+      onChange(name);
+    });
+    field2.addEventListener("mousedown", (e) => {
+      e.preventDefault();
+      open();
+    });
+    field2.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        open();
+      }
+    });
+    return field2;
+  }
+  function openFontMenu(anchor, current, onPick) {
+    if (openMenuState && openMenuState.anchor === anchor) return closeMenu();
+    closeMenu();
+    loadFontPreviews();
+    const root = anchor.getRootNode();
+    const wrap = root.querySelector && root.querySelector(".wrap") || document.body;
+    const search = h("input", { class: "font-search", type: "text", placeholder: "Search fonts\u2026", spellcheck: "false" });
+    const list = h("div", { class: "font-list" });
+    const groups = [
+      ["System", SYSTEM_FONTS.map((s) => s.name)],
+      ["Google Fonts", GOOGLE_FONTS.map((g) => g.name)]
+    ];
+    const rows = [];
+    for (const [title, names] of groups) {
+      const header = h("div", { class: "font-group" }, [h("span", { text: title })]);
+      list.appendChild(header);
+      const groupRows = [];
+      for (const name of names) {
+        const active = name === current;
+        const item = h("div", { class: "dropdown-item font-item" + (active ? " active" : "") }, [
+          h("span", { class: "font-name", text: name, style: `font-family:${previewStack(name)}` }),
+          active ? h("span", { class: "dropdown-check", html: CHECK_SVG }) : null
+        ]);
+        item.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onPick(name);
+          closeMenu();
+        });
+        list.appendChild(item);
+        const row = { el: item, name, label: name.toLowerCase(), header };
+        rows.push(row);
+        groupRows.push(row);
+      }
+      header._rows = groupRows;
+    }
+    const menu = h("div", { class: "dropdown-menu font-menu", "data-inspect-ui": "" }, [search, list]);
+    wrap.appendChild(menu);
+    const r = anchor.getBoundingClientRect();
+    menu.style.left = Math.round(r.left) + "px";
+    menu.style.top = Math.round(r.bottom + 4) + "px";
+    menu.style.minWidth = Math.max(210, Math.round(r.width)) + "px";
+    const mr = menu.getBoundingClientRect();
+    if (mr.bottom > window.innerHeight - 8) menu.style.top = Math.max(8, Math.round(r.top - mr.height - 4)) + "px";
+    const activeItem = menu.querySelector(".font-item.active");
+    if (activeItem) activeItem.scrollIntoView({ block: "center" });
+    const filter = () => {
+      const q = search.value.trim().toLowerCase();
+      for (const row of rows) row.el.style.display = !q || row.label.includes(q) ? "" : "none";
+      for (const header of list.querySelectorAll(".font-group")) {
+        const any = header._rows.some((row) => row.el.style.display !== "none");
+        header.style.display = any ? "" : "none";
+      }
+    };
+    search.addEventListener("input", filter);
+    search.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        const first = rows.find((row) => row.el.style.display !== "none");
+        if (first) {
+          onPick(first.name);
+          closeMenu();
+        }
+      }
+    });
+    anchor.classList.add("open");
+    const onDoc = (e) => {
+      if (!e.composedPath().includes(menu) && !e.composedPath().includes(anchor)) closeMenu();
+    };
+    const onKey = (e) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    setTimeout(() => {
+      document.addEventListener("mousedown", onDoc, true);
+      document.addEventListener("keydown", onKey, true);
+      window.addEventListener("scroll", onDoc, true);
+      search.focus();
+    }, 0);
+    openMenuState = { menu, anchor, onDoc, onKey };
+  }
   function expandBtn(active, iconName, title, onClick) {
     return h("button", {
       class: "exp-btn" + (active ? " on" : ""),
@@ -1687,10 +1909,12 @@ ${body}
       }
       body.append(section("Appearance", app));
       body.append(section("Typography", [
-        labeled("Typeface", selectField({
+        labeled("Typeface", fontField({
           value: firstFont(m.typography.fontFamily),
-          options: [firstFont(m.typography.fontFamily), "Quicksand", "Inter", "Arial", "Georgia", "system-ui", "monospace"],
-          onChange: on("font-family")
+          onChange: (name) => {
+            ensureGoogleFont(name);
+            on("font-family")(fontStack(name));
+          }
         })),
         h("div", { class: "row" }, [
           selectField({ value: weightName(m.typography.fontWeight), options: [["300", "Light"], ["400", "Regular"], ["500", "Medium"], ["600", "SemiBold"], ["700", "Bold"], ["800", "Extra"]], onChange: on("font-weight") }),
@@ -3112,6 +3336,27 @@ ${fontFace}
 .dropdown-item.active { color: var(--blue); }
 .dropdown-check { width: 14px; height: 14px; display: grid; place-items: center; flex: none; }
 
+/* ---------- Font picker (searchable) ---------- */
+.dropdown-menu.font-menu { padding: 0; max-height: 340px; overflow: hidden; display: flex; flex-direction: column; width: 240px; }
+.font-search {
+  margin: 6px; padding: 8px 10px; border-radius: 8px; flex: none;
+  background: var(--field); border: 1px solid var(--tool-border); color: var(--text);
+  font-family: var(--font); font-size: 13.5px; font-weight: 500; outline: none;
+}
+.font-search:focus { border-color: var(--blue); }
+.font-search::placeholder { color: var(--muted); }
+.font-list { overflow-y: auto; padding: 0 5px 5px; }
+.font-list::-webkit-scrollbar { width: 8px; }
+.font-list::-webkit-scrollbar-thumb { background: var(--field-2); border-radius: 8px; }
+.font-group {
+  font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted); padding: 9px 9px 4px;
+}
+.font-item .font-name {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 15px; line-height: 1.2;
+}
+
 /* ---------- Custom tooltip ---------- */
 .tooltip {
   position: fixed; z-index: 2147483647; pointer-events: none;
@@ -3317,7 +3562,7 @@ ${fontFace}
       return;
     }
     const app = new App();
-    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.15.0" };
+    window.InspectCSS = { app, destroy: () => app.destroy(), version: "0.16.0" };
   }
   boot();
 })();
