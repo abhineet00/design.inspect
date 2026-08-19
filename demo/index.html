@@ -186,6 +186,31 @@
     .cta-band h2 { font-size: 42px; margin: 0 0 12px; }
     .cta-band p { color: var(--ink-2); font-size: 17px; margin: 0 auto 26px; max-width: 46ch; }
 
+    /* get / install */
+    .get-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .get-card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 26px; display: flex; flex-direction: column; }
+    .get-card .k { font-family: var(--display); font-weight: 600; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+    .get-card h3 { font-size: 20px; margin: 10px 0 6px; }
+    .get-card p { margin: 0 0 18px; color: var(--ink-2); font-size: 14.5px; }
+    .get-card .spacer { flex: 1; }
+    .mark-btn { display: inline-flex; align-items: center; gap: 10px; align-self: flex-start; font-family: var(--display); font-weight: 700; font-size: 15px; padding: 13px 22px; border-radius: 12px; cursor: grab; border: 1px solid transparent; user-select: none; transition: transform .15s ease, box-shadow .2s ease; }
+    .mark-btn:hover { transform: translateY(-2px); }
+    .mark-btn:active { cursor: grabbing; }
+    .mark-btn.primary { background: var(--brand); color: #0a0c10; box-shadow: 0 12px 30px -10px rgba(88,174,255,.5); }
+    .mark-btn.alt { background: var(--surface-2); color: var(--ink); border: 1px solid var(--line-2); }
+    .mark-btn.loading { opacity: .55; pointer-events: none; cursor: default; }
+    .mark-btn .grip { font-size: 13px; letter-spacing: -2px; opacity: .7; }
+    .get-hint { margin-top: 12px; font-size: 12.5px; color: var(--muted); }
+    .get-hint a { color: var(--ink-2); text-decoration: underline; cursor: pointer; }
+    .get-hint a:hover { color: var(--ink); }
+    .get-steps { display: flex; gap: 26px; flex-wrap: wrap; margin-top: 26px; padding: 18px 22px; border: 1px dashed var(--line-2); border-radius: 16px; }
+    .get-steps > div { font-size: 13.5px; color: var(--ink-2); display: flex; gap: 9px; align-items: baseline; }
+    .get-steps b { font-family: var(--display); color: var(--blue); font-size: 15px; }
+    .badge-soft { font-family: var(--display); font-weight: 600; font-size: 10.5px; padding: 3px 9px; border-radius: 999px; }
+    .badge-soft.rec { background: rgba(51,214,159,.16); color: var(--green); }
+    .badge-soft.strict { background: rgba(179,107,255,.16); color: var(--violet); }
+    @media (max-width: 900px) { .get-grid { grid-template-columns: 1fr; } }
+
     footer { border-top: 1px solid var(--line); padding: 40px 0; margin-top: 40px; }
     .foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13.5px; }
     .foot a { color: var(--ink-2); }
@@ -224,12 +249,12 @@
       <nav class="nav-links">
         <a href="#playground">Playground</a>
         <a href="#features">Features</a>
-        <a href="#how">How it works</a>
-        <a href="https://github.com" target="_blank" rel="noopener">GitHub&nbsp;↗</a>
+        <a href="#get">Install</a>
+        <a href="https://github.com/abhineet00/design.inspect" target="_blank" rel="noopener">GitHub&nbsp;↗</a>
       </nav>
       <div class="nav-cta">
-        <a class="btn ghost" href="https://github.com" target="_blank" rel="noopener">Star</a>
-        <a class="btn primary" href="#playground">Try it now</a>
+        <a class="btn ghost" href="https://github.com/abhineet00/design.inspect" target="_blank" rel="noopener">★ Star</a>
+        <a class="btn primary" href="#get">Add to any site</a>
       </div>
     </div>
   </header>
@@ -385,6 +410,38 @@
         </div>
       </section>
 
+      <section id="get">
+        <div class="sec-head">
+          <span class="eyebrow"><span class="dot"></span> Free forever · no store, no $5</span>
+          <h2>Take it to any website.</h2>
+          <p>No Chrome Web Store fee, no extension review. Drag a button to your bookmarks bar and click it on any page — real sites and <code>localhost</code> alike.</p>
+        </div>
+        <div class="get-grid">
+          <div class="get-card">
+            <span class="k">Bookmarklet <span class="badge-soft rec">Recommended</span></span>
+            <h3>Always up to date</h3>
+            <p>Loads the latest InspectCSS on demand. Works on the vast majority of sites and on your local dev server.</p>
+            <div class="spacer"></div>
+            <a class="mark-btn primary" id="loaderMark" draggable="true" onclick="return false;"
+               href="javascript:(function(){if(window.InspectCSS){window.InspectCSS.destroy();return;}var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js';s.setAttribute('data-inspect-ui','');(document.body||document.documentElement).appendChild(s);})();"><span class="grip">⣿</span> InspectCSS</a>
+            <div class="get-hint">Drag me to your bookmarks bar. <a id="copyLoader">Copy the code instead</a></div>
+          </div>
+          <div class="get-card">
+            <span class="k">Offline bookmarklet <span class="badge-soft strict">For strict sites</span></span>
+            <h3>Self-contained</h3>
+            <p>The whole tool lives inside the bookmark, so it runs on locked-down sites (GitHub, banks) that block loaded scripts.</p>
+            <div class="spacer"></div>
+            <a class="mark-btn alt loading" id="inlineMark" draggable="true" onclick="return false;" href="javascript:void(0)"><span class="grip">⣿</span> InspectCSS · offline</a>
+            <div class="get-hint"><span id="inlineState">Preparing the offline build…</span> · <a id="copyInline">Copy the code instead</a></div>
+          </div>
+        </div>
+        <div class="get-steps">
+          <div><b>1</b> Show the bookmarks bar — <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">B</span></div>
+          <div><b>2</b> Drag a button above onto it</div>
+          <div><b>3</b> Open any site, click the bookmark — click again to close</div>
+        </div>
+      </section>
+
       <section>
         <div class="cta-band">
           <h2>Edit any website, right now.</h2>
@@ -398,7 +455,7 @@
   <footer>
     <div class="wrap foot">
       <span>InspectCSS — free &amp; open-source. Built for people who'd rather see the change than guess it.</span>
-      <span><a href="https://github.com" target="_blank" rel="noopener">GitHub</a> · <a href="#top">Back to top</a></span>
+      <span><a href="https://github.com/abhineet00/design.inspect" target="_blank" rel="noopener">GitHub</a> · <a href="#get">Install</a> · <a href="#top">Back to top</a></span>
     </div>
   </footer>
 
@@ -409,5 +466,45 @@
 
   <!-- Load the editor. Run `npm run build` first to produce dist/inspect.js -->
   <script src="../dist/inspect.js"></script>
+
+  <!-- Build the offline (self-contained) bookmarklet from the shipped bundle,
+       and wire the "copy code" links. -->
+  <script>
+    (function () {
+      var CDN = 'https://cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js';
+      var inlineMark = document.getElementById('inlineMark');
+      var inlineState = document.getElementById('inlineState');
+
+      function build(code) {
+        // The bundle is a self-invoking IIFE that toggles on/off via window.InspectCSS.
+        var href = 'javascript:' + encodeURIComponent(code + '\n;void 0;');
+        inlineMark.setAttribute('href', href);
+        inlineMark.classList.remove('loading');
+        inlineState.textContent = 'Ready — drag me to your bookmarks bar.';
+      }
+      // Prefer the local copy (same-origin, always in sync); fall back to the CDN.
+      fetch('../dist/inspect.min.js')
+        .then(function (r) { if (!r.ok) throw 0; return r.text(); })
+        .then(build)
+        .catch(function () {
+          fetch(CDN).then(function (r) { return r.text(); }).then(build)
+            .catch(function () { inlineState.textContent = 'Offline build unavailable — use the recommended bookmarklet.'; });
+        });
+
+      function copyFrom(el, link, label) {
+        link.addEventListener('click', function (e) {
+          e.preventDefault();
+          var code = el.getAttribute('href') || '';
+          if (!code || code === 'javascript:void(0)') return;
+          navigator.clipboard.writeText(code).then(function () {
+            var old = link.textContent; link.textContent = 'Copied ✓';
+            setTimeout(function () { link.textContent = old; }, 1600);
+          });
+        });
+      }
+      copyFrom(document.getElementById('loaderMark'), document.getElementById('copyLoader'));
+      copyFrom(inlineMark, document.getElementById('copyInline'));
+    })();
+  </script>
 </body>
 </html>

@@ -58,16 +58,26 @@ Three ways to load `dist/inspect.js`, pick whichever suits you.
 <script src="/path/to/inspect.js"></script>
 ```
 
-### 2. Bookmarklet (any site)
+### 2. Bookmarklet (any site — no install, no store fee)
 
-Host `dist/inspect.js` somewhere, then generate a bookmarklet that loads it:
+The easiest way for anyone to use it. Open the [landing page](demo/index.html)
+and **drag either button to your bookmarks bar** — click it on any page
+(including `localhost`) to toggle the editor on and off:
+
+- **InspectCSS** — a tiny loader that pulls the latest build from jsDelivr, so
+  it always stays up to date.
+- **InspectCSS · offline** — the whole tool packed inside the bookmark, so it
+  also runs on strict-CSP sites (GitHub, banks) that block loaded scripts.
+
+Prefer to generate the loader yourself? It's served free from the repo via
+jsDelivr:
 
 ```bash
-node scripts/bookmarklet.mjs https://your-host.com/inspect.js
+node scripts/bookmarklet.mjs
+# → javascript:… loading cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js
 ```
 
 Create a new bookmark and paste the printed `javascript:…` string as its URL.
-Click it on any page to toggle the editor on and off.
 
 ### 3. Browser extension (Chrome / Edge, MV3)
 
@@ -111,7 +121,7 @@ selector derived from the element's real ids/classes.
 Loading the bundle exposes a small global:
 
 ```js
-window.InspectCSS.version    // "0.1.0"
+window.InspectCSS.version    // "0.15.0"
 window.InspectCSS.destroy()  // remove the editor and all injected styles
 window.InspectCSS.app.select(element)  // select an element programmatically
 ```
