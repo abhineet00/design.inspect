@@ -107,11 +107,41 @@
     /* playground canvas */
     .canvas {
       background: var(--stone-2); border: 1px solid var(--line); border-radius: 26px;
-      padding: 22px; box-shadow: var(--shadow);
+      padding: 22px; box-shadow: var(--shadow); position: relative;
     }
     .canvas-bar { display: flex; align-items: center; gap: 8px; padding: 4px 6px 16px; }
     .canvas-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line-2); display: block; }
     .canvas-bar .label { margin-left: 8px; font-size: 12.5px; color: var(--faint); font-family: var(--mono); }
+
+    /* ambient inspector surface — crosshair + element dimensions on hover */
+    .inspect-surface {
+      position: absolute; inset: 0; pointer-events: none; z-index: 6;
+      border-radius: 26px; overflow: hidden; opacity: 0; transition: opacity .16s ease;
+    }
+    .inspect-surface.on { opacity: 1; }
+    .xhair { position: absolute; background: var(--lime-deep); opacity: .5; will-change: transform; }
+    .xhair.v { top: 0; bottom: 0; width: 1px; }
+    .xhair.h { left: 0; right: 0; height: 1px; }
+    .hit-box {
+      position: absolute; border: 1px solid var(--lime-deep); border-radius: 3px;
+      background: rgba(194, 236, 102, 0.10); box-shadow: 0 0 0 3px rgba(194, 236, 102, 0.12);
+      opacity: 0; transition: opacity .1s ease, left .07s ease, top .07s ease, width .07s ease, height .07s ease;
+    }
+    .hit-box::before, .hit-box::after {
+      content: ""; position: absolute; width: 5px; height: 5px; background: var(--lime-deep); border-radius: 1px;
+    }
+    .hit-box::before { top: -3px; left: -3px; }
+    .hit-box::after { bottom: -3px; right: -3px; }
+    .dim-badge {
+      position: absolute; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: -.01em;
+      color: var(--ink); background: var(--lime); padding: 2px 7px; border-radius: 5px; white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(20, 20, 15, 0.28); opacity: 0; transition: opacity .1s ease;
+    }
+    .coord {
+      position: absolute; font-family: var(--mono); font-size: 10.5px; color: var(--ink-2);
+      background: var(--card); border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px;
+      white-space: nowrap; transform: translateZ(0);
+    }
     .play-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
     .cell { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; position: relative; }
     .cell .tag { position: absolute; top: 11px; right: 13px; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
@@ -470,6 +500,65 @@ web page, then return the updated HTML/CSS.
       // Tag the control buttons as tool UI so that, once picking is active, the
       // inspector ignores clicks on them and our toggle handler still runs.
       tryButtons().forEach((b) => { b.setAttribute('data-inspect-ui', ''); b.addEventListener('click', activate); });
+
+      /* ---- Ambient inspector surface on the playground ---- *
+       * A passive tease of the real tool: as the cursor moves over the canvas a
+       * crosshair tracks it, the element underneath gets a highlight box, and a
+       * live W×H badge appears. No editing — clicking "Try it" hands over to the
+       * real inspector, at which point this surface steps aside.                */
+      (function () {
+        const canvas = document.querySelector('#playground .canvas');
+        // Pointer-only: skip on touch, where a tracked crosshair makes no sense.
+        if (!canvas || !window.matchMedia('(hover: hover)').matches) return;
+
+        const surface = document.createElement('div');
+        surface.className = 'inspect-surface';
+        surface.setAttribute('data-inspect-ui', ''); // real tool ignores our overlay
+        surface.innerHTML =
+          '<div class="xhair v"></div><div class="xhair h"></div>' +
+          '<div class="hit-box"></div><div class="dim-badge"></div><div class="coord"></div>';
+        canvas.appendChild(surface);
+        const v = surface.querySelector('.xhair.v');
+        const h = surface.querySelector('.xhair.h');
+        const box = surface.querySelector('.hit-box');
+        const badge = surface.querySelector('.dim-badge');
+        const coord = surface.querySelector('.coord');
+        let raf = 0, last = null;
+
+        function draw() {
+          raf = 0;
+          if (!last) return;
+          if (window.InspectCSS) { surface.classList.remove('on'); return; } // real tool takes over
+          const cr = canvas.getBoundingClientRect();
+          const x = last.clientX - cr.left, y = last.clientY - cr.top;
+          surface.classList.add('on');
+          v.style.transform = 'translateX(' + x + 'px)';
+          h.style.transform = 'translateY(' + y + 'px)';
+          coord.textContent = Math.round(x) + ', ' + Math.round(y);
+          coord.style.left = Math.min(x + 12, cr.width - 66) + 'px';
+          coord.style.top = Math.min(y + 12, cr.height - 22) + 'px';
+
+          // Deepest element under the cursor (our overlay is pointer-events:none,
+          // so it's skipped) — mirrors how the real inspector picks a target.
+          const el = document.elementFromPoint(last.clientX, last.clientY);
+          if (!el || el === canvas || surface.contains(el) || !canvas.contains(el)) {
+            box.style.opacity = 0; badge.style.opacity = 0; return;
+          }
+          const er = el.getBoundingClientRect();
+          const bx = er.left - cr.left, by = er.top - cr.top;
+          box.style.opacity = 1; badge.style.opacity = 1;
+          box.style.left = bx + 'px'; box.style.top = by + 'px';
+          box.style.width = er.width + 'px'; box.style.height = er.height + 'px';
+          badge.textContent = Math.round(er.width) + ' × ' + Math.round(er.height);
+          let top = by - 22; if (top < 2) top = by + er.height + 6; // flip below near the top edge
+          badge.style.left = Math.max(2, Math.min(bx, cr.width - badge.offsetWidth - 2)) + 'px';
+          badge.style.top = top + 'px';
+        }
+        canvas.addEventListener('mousemove', (e) => { last = e; if (!raf) raf = requestAnimationFrame(draw); });
+        canvas.addEventListener('mouseleave', () => {
+          last = null; surface.classList.remove('on'); box.style.opacity = 0; badge.style.opacity = 0;
+        });
+      })();
 
       /* ---- Build the offline bookmarklet + wire copy links ---- */
       const CDN = 'https://cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js';
