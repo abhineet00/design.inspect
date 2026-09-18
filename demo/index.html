@@ -3,285 +3,359 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>InspectCSS — edit your AI-built site, hand your AI the prompt</title>
-  <meta name="description" content="Built a site with Cursor, Lovable or v0? Point at what's off, fix it live, and copy an exact prompt your AI applies in one shot. Free, open-source, runs on any site including localhost." />
+  <title>Design.Inspect — point at your AI-built site, get the exact prompt</title>
+  <meta name="description" content="Built your site with AI? Point at what's off, fix it live, and copy the exact prompt — real selectors, real values — for Cursor, Claude or v0 to apply. Free and open-source." />
   <style>
+    @font-face {
+      font-family: 'Quicksand';
+      src: url('quicksand.woff2') format('woff2');
+      font-weight: 300 700; font-style: normal; font-display: swap;
+    }
     :root {
-      /* warm stone base + signature lime, dark bands for contrast */
-      --stone:   #e7e2db;
-      --stone-2: #ede8e1;
-      --card:    #f4f0ea;
-      --ink:     #14140f;
-      --ink-2:   #56534b;
-      --faint:   #8b877e;
-      --line:    rgba(20, 20, 15, 0.10);
-      --line-2:  rgba(20, 20, 15, 0.17);
-      --lime:    #c2ec66;
-      --lime-2:  #d4fb8e;
-      --lime-deep: #a7d446;
-      --blue:    #3b82f6;
-      --dark:    #111110;
-      --dark-2:  #1a1a17;
-      --dark-card: #201f1b;
-      --dark-line: rgba(255, 255, 255, 0.10);
-      --on-dark: #f2eeea;
-      --on-dark-2: #a8a49b;
-      --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, Helvetica, Arial, sans-serif;
+      --bg:      #1b1b1b;
+      --panel:   #191919;
+      --card:    #1c1c1c;
+      --card-2:  #202020;
+      --pg-card: #262626;
+      --text:    #ffffff;
+      --muted:   #8f8f8f;
+      --muted-2: #b4b4b4;
+      --faint:   #6d6d6d;
+      --line:    rgba(255, 255, 255, 0.09);
+      --line-2:  rgba(255, 255, 255, 0.14);
+      --sans: 'Quicksand', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       --mono: ui-monospace, 'SF Mono', 'Segoe UI Mono', Menlo, Consolas, monospace;
-      --shadow: 0 24px 60px -24px rgba(20, 20, 15, 0.35);
-      --r: 18px;
+      --r-panel: 40px;
+      --r-card: 24px;
+      --tile: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='46' height='46'%3E%3Crect x='7' y='6' width='32' height='34' rx='13' fill='rgba(255,255,255,0.022)'/%3E%3C/svg%3E");
+      --star: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 0C12.7 8 16 11.3 24 12C16 12.7 12.7 16 12 24C11.3 16 8 12.7 0 12C8 11.3 11.3 8 12 0Z' fill='rgba(255,255,255,0.26)'/%3E%3C/svg%3E");
     }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
     body {
-      margin: 0; background: var(--stone); color: var(--ink);
-      font-family: var(--sans); font-size: 16px; line-height: 1.55;
+      margin: 0; background: var(--bg); color: var(--text);
+      font-family: var(--sans); font-size: 16px; font-weight: 500; line-height: 1.5;
       -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
     }
-    h1, h2, h3 { letter-spacing: -0.03em; line-height: 1.04; margin: 0; font-weight: 640; }
+    h1, h2, h3 { margin: 0; font-weight: 600; line-height: 1.05; letter-spacing: -0.01em; }
     p { margin: 0; }
     a { color: inherit; text-decoration: none; }
-    code { font-family: var(--mono); font-size: 0.88em; background: rgba(20,20,15,.06); padding: 1px 6px; border-radius: 6px; }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
-    .eyebrow {
-      display: inline-flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 550;
-      letter-spacing: 0.01em; color: var(--ink-2);
-      background: var(--card); border: 1px solid var(--line); padding: 6px 13px; border-radius: 999px;
-    }
-    .eyebrow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--lime-deep); }
+    code { font-family: var(--mono); font-size: 0.85em; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 28px; }
+    .mlabel { font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: var(--faint); display: inline-flex; align-items: center; gap: 8px; }
+    .mlabel i { width: 6px; height: 6px; border-radius: 50%; background: #fff; flex: none; }
 
-    /* buttons */
+    /* buttons — pills */
     .btn {
       display: inline-flex; align-items: center; gap: 8px; font-family: var(--sans);
-      font-weight: 600; font-size: 15px; padding: 12px 20px; border-radius: 12px;
-      border: 1px solid transparent; cursor: pointer; transition: transform .14s ease, background .18s, box-shadow .2s;
-      white-space: nowrap; background: none;
+      font-weight: 600; font-size: 15px; padding: 12px 22px; border-radius: 999px;
+      border: 1px solid transparent; cursor: pointer; background: none; white-space: nowrap;
+      transition: transform .14s ease, background .16s, border-color .16s, opacity .16s;
     }
-    .btn.primary { background: var(--lime); color: var(--ink); box-shadow: 0 10px 26px -12px rgba(167,212,70,.9); }
-    .btn.primary:hover { background: var(--lime-2); transform: translateY(-1px); }
-    .btn.ghost { background: var(--card); color: var(--ink); border-color: var(--line-2); }
-    .btn.ghost:hover { background: #fff; transform: translateY(-1px); }
-    .btn.dark { background: var(--ink); color: var(--stone); }
-    .btn.dark:hover { transform: translateY(-1px); }
-    .btn.on-dark { background: var(--lime); color: var(--ink); }
-    .btn.sm { padding: 9px 15px; font-size: 14px; border-radius: 10px; }
-    .btn.active-state { background: var(--ink); color: var(--lime); }
+    .btn.white { background: #fff; color: #141414; }
+    .btn.white:hover { background: #e6e6e6; transform: translateY(-1px); }
+    .btn.dark { background: rgba(255,255,255,.03); color: #fff; border-color: var(--line-2); }
+    .btn.dark:hover { background: rgba(255,255,255,.07); transform: translateY(-1px); }
+    .btn.sm { padding: 9px 17px; font-size: 14px; }
+    .btn.active-state { background: #fff; color: #141414; }
 
     /* nav */
-    header {
-      position: sticky; top: 0; z-index: 100;
-      background: rgba(231, 226, 219, 0.78); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-      border-bottom: 1px solid var(--line);
-    }
-    .nav { display: flex; align-items: center; justify-content: space-between; height: 62px; }
-    .brand { display: flex; align-items: center; gap: 10px; font-weight: 680; font-size: 17px; letter-spacing: -0.02em; }
-    .brand .mark {
-      width: 26px; height: 26px; border-radius: 8px; background: var(--ink); position: relative; flex: none;
-    }
-    .brand .mark::after { content: ""; position: absolute; inset: 6px; border-radius: 3px; border: 2px solid var(--lime); }
-    .nav-right { display: flex; align-items: center; gap: 8px; }
-    .nav-right a.link { color: var(--ink-2); font-size: 14.5px; font-weight: 500; padding: 8px 10px; border-radius: 8px; }
-    .nav-right a.link:hover { color: var(--ink); }
+    header { position: sticky; top: 0; z-index: 100; background: rgba(27,27,27,.72); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 74px; }
+    .brand { font-weight: 700; font-size: 20px; letter-spacing: -0.01em; }
+    .nav-right { display: flex; align-items: center; gap: 22px; }
+    .nav-right a.link { color: var(--muted-2); font-size: 15px; font-weight: 500; }
+    .nav-right a.link:hover { color: #fff; }
 
     /* hero */
-    .hero { position: relative; text-align: center; padding: 96px 0 40px; overflow: hidden; }
-    .hero::before {
-      content: ""; position: absolute; left: 50%; top: -260px; transform: translateX(-50%);
-      width: 1100px; height: 620px; pointer-events: none; z-index: 0;
-      background: radial-gradient(50% 55% at 50% 45%, rgba(194,236,102,.62), rgba(194,236,102,.14) 46%, transparent 72%);
-      filter: blur(4px);
-    }
+    .hero { position: relative; text-align: center; padding: 70px 0 120px; overflow: hidden; background-image: var(--tile); background-position: center top; }
+    .hero::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+      background: radial-gradient(120% 80% at 50% 30%, transparent 40%, var(--bg) 92%); }
     .hero > * { position: relative; z-index: 1; }
-    .hero h1 { font-size: 68px; font-weight: 660; margin: 22px auto 0; max-width: 15ch; }
-    .hero h1 .em { color: var(--lime-deep); }
-    .hero .lede { font-size: 19px; color: var(--ink-2); max-width: 52ch; margin: 22px auto 0; }
-    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 30px; }
-    .hero-note { margin-top: 16px; color: var(--faint); font-size: 13.5px; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 9px; font-family: var(--mono); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); background: rgba(255,255,255,.03); border: 1px solid var(--line); padding: 7px 15px; border-radius: 999px; }
+    .eyebrow i { width: 6px; height: 6px; border-radius: 50%; background: #fff; }
+    .hero h1 { font-size: 84px; font-weight: 600; letter-spacing: -0.02em; margin: 30px auto 0; max-width: 13ch; }
+    .hero h1 .em { color: var(--muted); }
+    .hero .lede { font-size: 19px; color: var(--muted-2); max-width: 46ch; margin: 26px auto 0; line-height: 1.55; }
+    .hero-cta { display: flex; gap: 14px; justify-content: center; margin-top: 34px; }
 
-    /* section shell */
-    section { padding: 60px 0; }
-    .sec-head { max-width: 640px; margin: 0 auto 36px; text-align: center; }
-    .sec-head h2 { font-size: 36px; margin-bottom: 12px; }
-    .sec-head p { color: var(--ink-2); font-size: 16.5px; }
+    /* stacked rounded panels */
+    .stack { display: flex; flex-direction: column; gap: 0; padding-bottom: 60px; }
+    .panel { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r-panel); padding: 46px; }
+    .panel.star::before, .panel.star::after { content: ""; position: absolute; top: -37px; width: 20px; height: 20px; background: var(--star) center/contain no-repeat; opacity: .85; }
+    .panel.star::before { left: 4px; } .panel.star::after { right: 4px; }
 
-    /* playground canvas */
-    .canvas {
-      background: var(--stone-2); border: 1px solid var(--line); border-radius: 26px;
-      padding: 22px; box-shadow: var(--shadow); position: relative;
-    }
-    .canvas-bar { display: flex; align-items: center; gap: 8px; padding: 4px 6px 16px; }
-    .canvas-bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line-2); display: block; }
-    .canvas-bar .label { margin-left: 8px; font-size: 12.5px; color: var(--faint); font-family: var(--mono); }
+    /* exact panels (measured from Figma) */
+    .epanel { background: #171717; border: 1px solid #3d3d3d; border-radius: 54px; padding: 12px; }
+    .p-head { display: flex; gap: 6px; align-items: center; padding: 16px; }
+    .p-head .htext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+    .p-head h2 { font-weight: 500; font-size: 28px; color: #fff; letter-spacing: -0.01em; }
+    .p-head .sub { font-weight: 400; font-size: 20px; color: #828282; }
+    .p-head .p-ico { width: 40px; height: 40px; flex: none; }
+    .p-head .p-ico img { width: 100%; height: 100%; display: block; }
+    .cards2 { display: flex; gap: 8px; align-items: stretch; min-height: 391px; }
+    .card { flex: 1; min-width: 0; background: #1b1b1b; border: 1px solid #3d3d3d; border-radius: 42px; padding: 24px; display: flex; flex-direction: column; overflow: hidden; }
+    .card.between { justify-content: space-between; }
+    .card.g32 { gap: 32px; }
+    .clabel { display: flex; align-items: center; gap: 8px; }
+    .clabel .dot { width: 7px; height: 7px; border-radius: 3.5px; background: #fff; flex: none; }
+    .clabel span { font-weight: 400; font-size: 12px; letter-spacing: 0.66px; text-transform: uppercase; color: #8f8f8f; }
+    .pre { height: 170px; overflow: auto; margin-top: 12px; }
+    .mock-css { font-family: var(--sans); font-size: 14px; line-height: 21.25px; white-space: pre; color: #ededed; margin: 0; }
+    .mock-css .sel { color: #fff; font-weight: 700; }
+    .mock-css .prop { color: #8f8f8f; }
+    .card-foot { margin-top: auto; padding-top: 16px; border-top: 0.667px solid rgba(255,255,255,0.09); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .card-foot .ft { color: #8f8f8f; font-size: 14px; }
+    .card-foot.plain { border-top: 0; color: #666; font-size: 14px; display: block; line-height: 20.93px; }
+    .copy-pill { background: #fff; color: #000; font-weight: 700; font-size: 14px; padding: 8px 12px; border-radius: 12px; white-space: nowrap; }
+    .logx { display: flex; flex-direction: column; margin-top: 12px; }
+    .logx .r { display: flex; align-items: flex-end; gap: 10px; height: 27.26px; padding-bottom: 8px; border-bottom: 0.667px dashed rgba(234,234,234,0.3); }
+    .logx .r:last-child { border-bottom: 0; height: 18.59px; padding-bottom: 0; }
+    .logx .sel { color: #fff; font-weight: 700; font-size: 14px; }
+    .logx .prop { color: #8f8f8f; font-size: 14px; flex: 1; }
+    .logx .val { color: #fff; font-size: 14px; white-space: nowrap; }
+    .sw { display: flex; gap: 6px; margin-top: 12px; }
+    .sw i { width: 26px; height: 26px; border-radius: 6px; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.09); display: block; flex: none; }
+    .tree { font-family: var(--mono); font-size: 12px; line-height: 18.6px; color: #6b7280; margin-top: 8px; height: 305px; overflow: auto; }
+    .tree .r { white-space: nowrap; }
+    .tree .t { color: #fff; } .tree .a { color: #626262; } .tree .v { color: #a8a8a8; } .tree .e { color: #828282; }
+    .tree .tw { color: #6b7280; display: inline-block; width: 12px; }
+    .pchips2 { display: flex; gap: 10px; margin-top: 16px; }
+    .pchips2 span { font-family: var(--sans); font-size: 14px; padding: 8px 16px; border-radius: 999px; border: 1px solid #3d3d3d; color: #8f8f8f; }
+    .pchips2 span.on { background: #fff; color: #000; border-color: #fff; }
+    .pstate-desc { color: #8f8f8f; font-size: 15px; margin-top: 14px; }
+    .pstate-desc b, .pstate-desc code { color: #fff; }
 
-    /* ambient inspector surface — crosshair + element dimensions on hover */
-    .inspect-surface {
-      position: absolute; inset: 0; pointer-events: none; z-index: 6;
-      border-radius: 26px; overflow: hidden; opacity: 0; transition: opacity .16s ease;
-    }
-    .inspect-surface.on { opacity: 1; }
-    .xhair { position: absolute; background: var(--lime-deep); opacity: .5; will-change: transform; }
-    .xhair.v { top: 0; bottom: 0; width: 1px; }
-    .xhair.h { left: 0; right: 0; height: 1px; }
-    .hit-box {
-      position: absolute; border: 1px solid var(--lime-deep); border-radius: 3px;
-      background: rgba(194, 236, 102, 0.10); box-shadow: 0 0 0 3px rgba(194, 236, 102, 0.12);
-      opacity: 0; transition: opacity .1s ease, left .07s ease, top .07s ease, width .07s ease, height .07s ease;
-    }
-    .hit-box::before, .hit-box::after {
-      content: ""; position: absolute; width: 5px; height: 5px; background: var(--lime-deep); border-radius: 1px;
-    }
-    .hit-box::before { top: -3px; left: -3px; }
-    .hit-box::after { bottom: -3px; right: -3px; }
-    .dim-badge {
-      position: absolute; font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: -.01em;
-      color: var(--ink); background: var(--lime); padding: 2px 7px; border-radius: 5px; white-space: nowrap;
-      box-shadow: 0 3px 10px rgba(20, 20, 15, 0.28); opacity: 0; transition: opacity .1s ease;
-    }
-    .coord {
-      position: absolute; font-family: var(--mono); font-size: 10.5px; color: var(--ink-2);
-      background: var(--card); border: 1px solid var(--line); padding: 1px 6px; border-radius: 5px;
-      white-space: nowrap; transform: translateZ(0);
-    }
-    .play-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 14px; }
-    .cell { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px; position: relative; }
-    .cell .tag { position: absolute; top: 11px; right: 13px; font-size: 10px; letter-spacing: .05em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
-    .col-7 { grid-column: span 7; } .col-5 { grid-column: span 5; }
-    .col-4 { grid-column: span 4; } .col-8 { grid-column: span 8; }
-    .col-6 { grid-column: span 6; } .col-3 { grid-column: span 3; }
+    /* ===== flanked section rows: main content panel with empty side panels ===== */
+    html, body { overflow-x: clip; }
+    .srow { display: flex; justify-content: center; align-items: stretch; width: 100%; }
+    .side { flex: none; width: 1390px; border: 1px solid #3d3d3d; border-radius: 61px; margin: 0; }
+    .main { flex: none; width: min(1390px, calc(100vw - 96px)); border: 1px solid #3d3d3d; border-radius: 61px; padding: 60px; margin: 0; display: flex; flex-direction: column; }
+    .main.g80 { gap: 80px; } .main.g60 { gap: 60px; }
 
-    .banner { min-height: 176px; border-radius: 14px; background: linear-gradient(135deg, #cfe8b0, #9fc06a);
-      display: flex; flex-direction: column; justify-content: flex-end; padding: 20px; }
-    .banner h3 { font-size: 22px; color: #1b2410; }
-    .banner p { margin-top: 4px; color: rgba(27,36,16,.72); font-size: 13.5px; }
+    /* how-it-works intro */
+    .hintro { display: flex; gap: 220px; align-items: flex-start; }
+    .hintro h2 { font-weight: 500; font-size: 42px; letter-spacing: -1.26px; line-height: 37px; color: #828282; width: 460px; flex: none; }
+    .hintro p { font-weight: 400; font-size: 24px; line-height: 25.58px; color: #828282; flex: 1; min-width: 0; }
 
-    .swatches { display: flex; gap: 10px; flex-wrap: wrap; }
-    .chip { width: 52px; height: 52px; border-radius: 13px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.06); }
-    .chip.a { background: linear-gradient(135deg, #d6d3cd, #b7b1a8); }
-    .chip.b { background: linear-gradient(135deg, #e9c7a8, #cf9f78); }
-    .chip.c { background: linear-gradient(135deg, #bcd4e8, #8fb3d6); }
-    .chip.d { background: var(--lime); }
-    .chip.e { background: conic-gradient(from 210deg, #9fc06a, #cf9f78, #8fb3d6, #c2ec66, #9fc06a); }
+    /* steps panel + rows */
+    .steps-panel { background: #1b1b1b; border: 1px solid #3d3d3d; border-radius: 54px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .step-row { display: flex; gap: 8px; align-items: center; }
+    .step-txt { width: 553.5px; flex: none; padding: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .step-txt h3 { font-weight: 500; font-size: 28px; color: #fff; }
+    .step-txt p { font-weight: 400; font-size: 18px; color: #828282; line-height: 1.25; }
+    .step-mock { flex: 1; min-width: 0; height: 391px; background: #1c1c1c; border: 1px solid #3d3d3d; border-radius: 42px; padding: 24px; display: flex; flex-direction: column; gap: 12px; align-items: center; overflow: hidden; }
+    .mhead { width: 100%; display: flex; align-items: center; justify-content: space-between; padding-bottom: 13px; border-bottom: 0.667px solid rgba(255,255,255,0.09); }
+    .mhead .ml { display: flex; align-items: center; gap: 8px; }
+    .mhead .ml .dot { width: 7px; height: 7px; border-radius: 3.5px; background: #fff; flex: none; }
+    .mhead .ml span { font-size: 11.5px; letter-spacing: 0.575px; text-transform: uppercase; color: #8f8f8f; }
+    .mhead .pill { background: #fff; color: #000; font-weight: 700; font-size: 12px; padding: 6px 12px; border-radius: 6px; }
+    .mfill { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; }
 
-    .btn-samples { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
-    .s-btn { font-family: var(--sans); font-weight: 600; font-size: 14px; padding: 10px 16px; border-radius: 10px; border: none; cursor: pointer; }
-    .s-btn.fill { background: var(--ink); color: var(--stone); }
-    .s-btn.lime { background: var(--lime); color: var(--ink); }
-    .s-btn.out { background: transparent; color: var(--ink); border: 1px solid var(--line-2); }
-    .s-btn.pill { background: #fff; color: var(--ink); border: 1px solid var(--line); border-radius: 999px; padding: 10px 20px; }
+    /* spacing mock (step 1) */
+    .spm { width: 232px; border: 0.5px solid #3d3d3d; border-radius: 22px; padding: 12px; display: flex; flex-direction: column; gap: 12px; }
+    .spm-top { display: flex; align-items: center; justify-content: space-between; }
+    .spm-top p { font-weight: 500; font-size: 11.28px; color: #fff; }
+    .spm-top img { width: 6px; opacity: .8; }
+    .spm-grp { display: flex; flex-direction: column; gap: 11.28px; }
+    .spm-set { display: flex; flex-direction: column; gap: 5.64px; }
+    .spm-sub { font-weight: 500; font-size: 8.46px; color: #828282; margin-bottom: 2.82px; }
+    .spm-flds { display: flex; gap: 5.64px; }
+    .spm-fld { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; border: 0.5px solid #3d3d3d; border-radius: 8.46px; padding: 5.64px; }
+    .spm-fld .l { display: flex; align-items: center; gap: 5.64px; }
+    .spm-fld img { width: 11.28px; height: 11.28px; }
+    .spm-fld .v { font-weight: 500; font-size: 9.87px; color: #fff; }
+    .spm-fld .u { font-size: 9.87px; color: #828282; }
+    .bxm { border: 0.705px solid #3d3d3d; border-radius: 16.9px; height: 142px; padding: 5.64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5.64px; position: relative; color: #fff; font-size: 8.46px; font-weight: 500; }
+    .bxm .lab { position: absolute; left: 7.75px; top: 3.52px; font-size: 5.64px; color: #828282; font-weight: 500; }
+    .bxm-mid { display: flex; align-items: center; justify-content: center; gap: 5.64px; width: 100%; flex: 1; min-height: 0; }
+    .bxm-pad { background: #1b1b1b; border: 0.705px dashed #3d3d3d; border-radius: 11.28px; height: 100%; flex: 1; min-width: 0; padding: 5.64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5.64px; position: relative; }
+    .bxm-core { border: 0.705px dashed #3d3d3d; border-radius: 8.46px; height: 100%; flex: 1; min-width: 0; padding: 5.64px; display: flex; align-items: center; justify-content: center; gap: 7px; position: relative; }
 
-    .specimen h3 { font-size: 46px; }
-    .specimen .g { color: var(--lime-deep); }
-    .specimen .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-    .badge { font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px; background: rgba(20,20,15,.06); color: var(--ink-2); }
+    /* prompt mock (step 2) */
+    .pmock { width: 100%; overflow: auto; display: flex; flex-direction: column; gap: 16px; font-family: var(--sans); }
+    .pmock .g1 { font-size: 14px; color: #ededed; line-height: 21.88px; }
+    .pmock .g2 { font-size: 14px; line-height: 21.88px; white-space: pre; color: #ededed; }
+    .pmock .g2 .b { color: #fff; font-weight: 700; }
+    .pmock .g3 { font-size: 14px; color: #8f8f8f; line-height: 21.88px; }
 
-    .price .amt { font-size: 40px; font-weight: 680; letter-spacing: -0.03em; }
-    .price .amt span { font-size: 15px; color: var(--faint); font-weight: 500; }
-    .price ul { list-style: none; padding: 0; margin: 14px 0 0; }
-    .price li { color: var(--ink-2); font-size: 14px; padding: 5px 0; display: flex; gap: 8px; align-items: center; }
-    .price li::before { content: ""; width: 15px; height: 15px; border-radius: 50%; background: var(--lime); flex: none; }
+    /* chat mock (step 3) */
+    .chatbox { width: 578px; max-width: 100%; background: #1b1b1b; border: 1px solid #3d3d3d; border-radius: 25px; padding: 17px; display: flex; flex-direction: column; gap: 20px; }
+    .chatbox .txt { font-size: 12px; color: #ededed; line-height: 18px; white-space: pre-wrap; }
+    .chatbar { display: flex; align-items: center; justify-content: space-between; }
+    .chatbar .l { display: flex; align-items: center; gap: 8px; }
+    .chatbar img { width: 20px; height: 20px; }
+    .chatbar .sq { width: 18px; height: 18px; border: 1px solid #898989; border-radius: 6px; flex: none; }
 
-    /* features strip */
-    .feat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-    .feat { padding: 22px; border-radius: 16px; border: 1px solid var(--line); background: var(--card); }
-    .feat .ic { width: 38px; height: 38px; border-radius: 11px; background: var(--stone); display: grid; place-items: center; margin-bottom: 14px; border: 1px solid var(--line); }
-    .feat .ic svg { width: 19px; height: 19px; }
-    .feat h3 { font-size: 17px; margin-bottom: 5px; }
-    .feat p { color: var(--ink-2); font-size: 14px; }
+    /* how-it-works intro */
+    .intro { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 40px; }
+    .intro h2 { font-size: 42px; font-weight: 400; color: var(--muted); letter-spacing: -0.02em; line-height: 1.12; }
+    .intro p { color: var(--muted); font-size: 19px; line-height: 1.5; align-self: center; }
 
-    /* compatibility pills (hero) */
-    .compat { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; margin-top: 26px; }
-    .compat .lead { color: var(--faint); font-size: 12.5px; font-weight: 500; }
-    .compat span.chip-ai { font-size: 12.5px; color: var(--ink-2); background: var(--card); border: 1px solid var(--line); padding: 6px 12px; border-radius: 999px; font-weight: 550; }
+    /* step card */
+    .step-card { border: 1px solid var(--line); border-radius: var(--r-card); padding: 30px; margin-top: 16px; display: grid; grid-template-columns: 1fr 1.12fr; gap: 40px; }
+    .step-text { align-self: end; }
+    .step-text h3 { font-size: 26px; font-weight: 600; margin-bottom: 12px; }
+    .step-text p { color: var(--muted); font-size: 16px; line-height: 1.55; }
+    .step-text p code { color: var(--muted-2); }
+    .mock { display: flex; flex-direction: column; }
+    .mock-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 14px; border-bottom: 1px solid var(--line); margin-bottom: 16px; }
+    .mock-pill { background: #fff; color: #141414; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; }
+    pre.code { margin: 0; font-family: var(--mono); font-size: 13px; line-height: 1.7; color: var(--muted-2); white-space: pre-wrap; word-break: break-word; }
+    pre.code .s { color: #fff; font-weight: 600; }
+    pre.code .k { color: #fff; }
 
-    /* how it works */
-    .how-grid { display: grid; grid-template-columns: 1fr 1.06fr; gap: 30px; align-items: center; }
-    .steps { display: flex; flex-direction: column; gap: 20px; }
-    .step { display: flex; gap: 14px; }
-    .step .n { width: 30px; height: 30px; flex: none; border-radius: 9px; background: var(--ink); color: var(--lime); display: grid; place-items: center; font-weight: 700; font-size: 14px; }
-    .step h3 { font-size: 17.5px; margin-bottom: 3px; }
-    .step p { color: var(--ink-2); font-size: 14.5px; }
-    .step p code { font-size: 0.86em; }
-    .prompt-card { background: var(--dark); border-radius: 20px; padding: 18px 20px 20px; box-shadow: var(--shadow); overflow: hidden; }
-    .prompt-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
-    .prompt-top .lbl { color: var(--on-dark-2); font-size: 11.5px; font-family: var(--mono); display: flex; align-items: center; gap: 8px; }
-    .prompt-top .lbl i { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); display: block; }
-    .prompt-top .copy { font-size: 12px; font-weight: 650; color: var(--ink); background: var(--lime); padding: 6px 12px; border-radius: 8px; }
-    .prompt-card pre { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.75; color: var(--on-dark); white-space: pre-wrap; word-break: break-word; overflow-x: auto; }
-    .prompt-card .c { color: var(--lime-2); }
-    .prompt-card .m { color: var(--on-dark-2); }
+    /* spacing mock */
+    .sp { max-width: 260px; margin: 0 auto; width: 100%; }
+    .sp-title { display: flex; align-items: center; justify-content: space-between; font-size: 14px; color: #fff; margin-bottom: 12px; }
+    .sp-sub { font-size: 12px; color: var(--muted); margin: 10px 0 6px; }
+    .sp-flds { display: flex; gap: 8px; }
+    .sp-fld { flex: 1; display: flex; align-items: center; gap: 6px; background: #262626; border-radius: 10px; padding: 7px 10px; font-size: 12.5px; }
+    .sp-fld svg { width: 12px; height: 12px; color: var(--muted); flex: none; }
+    .sp-fld .u { margin-left: auto; color: var(--muted); font-size: 11px; }
+    .boxm { margin-top: 14px; border: 1px dashed #333; border-radius: 12px; padding: 20px 10px 6px; position: relative; text-align: center; }
+    .boxm-lab { position: absolute; top: 5px; left: 12px; font-size: 8px; color: var(--muted); }
+    .boxm .n { font-size: 10px; color: var(--muted-2); }
+    .boxm-inner { border: 1px dashed #333; border-radius: 10px; padding: 18px 10px 6px; margin: 4px 0; position: relative; }
+    .boxm-core { border: 1px dashed #333; border-radius: 8px; padding: 12px 6px; position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; }
 
-    /* dark install band */
-    .band { background: var(--dark); color: var(--on-dark); border-radius: 30px; margin: 40px 0; padding: 56px; position: relative; overflow: hidden; }
-    .band::before { content: ""; position: absolute; left: 50%; top: -40%; transform: translateX(-50%);
-      width: 900px; height: 500px; pointer-events: none;
-      background: radial-gradient(50% 50% at 50% 50%, rgba(194,236,102,.22), transparent 68%); }
-    .band > * { position: relative; }
-    .band .sec-head h2 { color: var(--on-dark); }
-    .band .sec-head p { color: var(--on-dark-2); }
-    .get-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; max-width: 760px; margin: 0 auto; }
-    .get-card { background: var(--dark-card); border: 1px solid var(--dark-line); border-radius: 18px; padding: 22px; display: flex; flex-direction: column; }
-    .get-card .k { font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--on-dark-2); font-weight: 600; display: flex; align-items: center; gap: 8px; }
-    .get-card h3 { font-size: 18px; margin: 9px 0 5px; color: var(--on-dark); }
-    .get-card p { margin-bottom: 16px; color: var(--on-dark-2); font-size: 14px; }
-    .get-card .spacer { flex: 1; }
-    .mark-btn {
-      display: inline-flex; align-items: center; gap: 9px; align-self: flex-start; font-weight: 640;
-      font-size: 15px; padding: 12px 20px; border-radius: 12px; cursor: grab; user-select: none; border: 1px solid transparent;
-      transition: transform .14s ease;
-    }
-    .mark-btn:hover { transform: translateY(-1px); }
+    /* chat-input mock */
+    .chat { border: 1px solid var(--line); border-radius: 16px; padding: 14px; }
+    .chat pre { margin: 0 0 12px; font-family: var(--mono); font-size: 11.5px; line-height: 1.65; color: var(--muted-2); white-space: pre-wrap; word-break: break-word; }
+    .chat-bar { display: flex; align-items: center; gap: 10px; color: var(--muted); }
+    .chat-bar .sp { flex: 1; }
+    .chat-bar svg { width: 16px; height: 16px; }
+    .chat-bar .ring { width: 15px; height: 15px; border: 1.5px solid var(--muted); border-radius: 4px; }
+
+    /* section (Changes / Assets / HTML) */
+    .sec-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 30px; }
+    .sec-top h2 { font-size: 34px; font-weight: 600; }
+    .sec-top .sub { color: var(--muted); font-size: 17px; margin-top: 6px; }
+    .sec-top .ico { width: 28px; height: 28px; color: var(--muted); flex: none; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .subcard { border: 1px solid var(--line); border-radius: var(--r-card); padding: 24px; display: flex; flex-direction: column; min-height: 260px; }
+    .subcard .mlabel { margin-bottom: 16px; }
+    .subcard .foot { margin-top: auto; padding-top: 18px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--faint); }
+
+    /* change log */
+    .log { display: flex; flex-direction: column; }
+    .log .r { display: flex; align-items: baseline; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+    .log .r:last-child { border-bottom: 0; }
+    .log .sel { color: #fff; font-weight: 600; font-family: var(--mono); font-size: 12.5px; }
+    .log .prop { color: var(--muted); font-family: var(--mono); font-size: 12.5px; flex: 1; }
+    .log .val { color: #fff; font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+
+    /* assets */
+    .sw-row { display: flex; gap: 8px; margin-bottom: 20px; }
+    .sw-row i { width: 34px; height: 34px; border-radius: 8px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); display: block; }
+    .subcard .grp2 { margin-top: 8px; }
+
+    /* pseudo chips */
+    .pchips { display: flex; gap: 10px; margin-top: 4px; }
+    .pchips span { font-family: var(--mono); font-size: 13px; padding: 8px 15px; border-radius: 999px; border: 1px solid var(--line-2); color: var(--muted); }
+    .pchips span.on { background: #fff; color: #141414; border-color: #fff; }
+    .pdesc { color: var(--muted); font-size: 15px; margin-bottom: 18px; }
+    .pdesc code { color: #fff; }
+
+    /* playground */
+    .pg-intro { text-align: center; margin-bottom: 34px; }
+    .pg-intro .eyebrow { margin-bottom: 20px; }
+    .pg-intro h2 { font-size: 46px; font-weight: 600; }
+    .pg-intro p { color: var(--muted); font-size: 17px; margin-top: 12px; }
+    .pg-intro p b { color: #fff; font-weight: 600; }
+    .canvas { position: relative; }
+    .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .pg-card { position: relative; background: linear-gradient(160deg, #2a2a2a, #1d1d1d); border: 1px solid var(--line); border-radius: var(--r-card); min-height: 300px; padding: 22px; display: flex; align-items: flex-end; }
+    .pg-card .mlabel { position: relative; z-index: 1; }
+    .pg-card.tall { min-height: 300px; }
+    .pg-card.small { min-height: 230px; }
+    .pg-card.image { background: #1b1b1b; background-image: var(--tile); align-items: center; justify-content: center; overflow: hidden; }
+    .pg-card.image .wm { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 600; color: #cfcfcf; }
+    .bento-row2 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-top: 16px; }
+
+    /* install */
+    .install { text-align: center; }
+    .install .eyebrow { margin-bottom: 20px; }
+    .install h2 { font-size: 46px; font-weight: 600; }
+    .install > p { color: var(--muted); font-size: 17px; margin: 12px auto 0; max-width: 48ch; }
+    .steps3-title { font-size: 27px; font-weight: 600; margin: 46px 0 22px; }
+    .steps3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; max-width: 780px; margin: 0 auto; }
+    .s3 { border: 1px solid var(--line); border-radius: 18px; padding: 26px 20px; }
+    .s3-body { min-height: 84px; display: grid; place-items: center; }
+    .s3-cap { color: var(--muted-2); font-size: 15px; margin-top: 16px; }
+    .kbds { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; }
+    .kbd { font-family: var(--mono); font-size: 12.5px; background: #262626; border: 1px solid var(--line-2); border-radius: 6px; padding: 4px 9px; color: #fff; }
+    .mark-btn { display: inline-flex; align-items: center; gap: 9px; background: #fff; color: #141414; font-weight: 600; font-size: 14px; padding: 9px 16px; border-radius: 999px; cursor: grab; user-select: none; }
     .mark-btn:active { cursor: grabbing; }
-    .mark-btn.primary { background: var(--lime); color: var(--ink); }
-    .mark-btn.alt { background: transparent; color: var(--on-dark); border: 1px solid var(--dark-line); }
-    .mark-btn.loading { opacity: .5; pointer-events: none; cursor: default; }
-    .mark-btn .grip { font-size: 12px; letter-spacing: -2px; opacity: .65; }
-    .get-hint { margin-top: 11px; font-size: 12.5px; color: var(--on-dark-2); }
-    .get-hint a { color: var(--on-dark); text-decoration: underline; cursor: pointer; }
-    .badge-soft { font-size: 10px; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
-    .badge-soft.rec { background: rgba(194,236,102,.2); color: var(--lime-2); }
-    .badge-soft.strict { background: rgba(255,255,255,.08); color: var(--on-dark-2); }
-    .get-steps { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; margin-top: 26px; color: var(--on-dark-2); font-size: 13.5px; }
-    .get-steps div { display: flex; gap: 8px; align-items: baseline; }
-    .get-steps b { color: var(--lime); font-weight: 700; }
-    .kbd { font-size: 11.5px; background: var(--dark-2); border: 1px solid var(--dark-line); border-radius: 5px; padding: 2px 6px; color: var(--on-dark); font-family: var(--mono); }
+    .mark-btn .grip { letter-spacing: -2px; opacity: .5; }
+    .s3-done { font-size: 18px; font-weight: 600; }
 
-    footer { border-top: 1px solid var(--line); padding: 30px 0; }
-    .foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; color: var(--faint); font-size: 13.5px; }
-    .foot a { color: var(--ink-2); } .foot a:hover { color: var(--ink); }
+    /* footer */
+    footer { position: relative; overflow: hidden; padding-top: 60px; }
+    .foot-top { display: flex; align-items: center; justify-content: space-between; }
+    .foot-made { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 15px; }
+    .foot-made:hover { color: #fff; }
+    .foot-social { display: flex; gap: 20px; }
+    .foot-social a { color: var(--muted); }
+    .foot-social a:hover { color: #fff; }
+    .foot-social svg { width: 18px; height: 18px; display: block; }
+    .wordmark { margin-top: 26px; font-size: clamp(70px, 15.5vw, 250px); font-weight: 600; letter-spacing: -0.03em; line-height: 0.9;
+      background: linear-gradient(180deg, #c9c9c9 0%, #6a6a6a 42%, #1b1b1b 96%); -webkit-background-clip: text; background-clip: text; color: transparent;
+      margin-bottom: -0.14em; user-select: none; white-space: nowrap; }
 
-    /* activation toast */
-    .toast {
-      position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(24px);
-      background: var(--ink); color: var(--stone); padding: 12px 18px; border-radius: 12px;
-      font-size: 14px; font-weight: 500; box-shadow: var(--shadow); z-index: 200;
-      display: flex; align-items: center; gap: 10px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s;
-    }
+    /* ambient inspector surface (playground) */
+    .inspect-surface { position: absolute; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; opacity: 0; transition: opacity .16s ease;
+      --xh: rgba(255,255,255,.5); --boxb: #fff; --boxbg: rgba(255,255,255,.06); --badgebg: #fff; --badgefg: #111; }
+    .inspect-surface.on { opacity: 1; }
+    .xhair { position: absolute; background: var(--xh); will-change: transform; }
+    .xhair.v { top: 0; bottom: 0; width: 1px; } .xhair.h { left: 0; right: 0; height: 1px; }
+    .hit-box { position: absolute; border: 1px solid var(--boxb); background: var(--boxbg); opacity: 0; transition: opacity .1s ease, left .07s ease, top .07s ease, width .07s ease, height .07s ease; }
+    .hit-box::before, .hit-box::after { content: ""; position: absolute; width: 5px; height: 5px; background: var(--boxb); }
+    .hit-box::before { top: -3px; left: -3px; } .hit-box::after { bottom: -3px; right: -3px; }
+    .dim-badge { position: absolute; font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--badgefg); background: var(--badgebg); padding: 2px 7px; border-radius: 4px; white-space: nowrap; opacity: 0; transition: opacity .1s ease; }
+
+    /* toast */
+    .toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(24px); background: #fff; color: #141414; padding: 12px 20px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 200; display: flex; align-items: center; gap: 10px; opacity: 0; pointer-events: none; transition: opacity .25s, transform .25s; }
     .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-    .toast .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--lime); box-shadow: 0 0 0 0 rgba(194,236,102,.6); animation: pulse 1.8s infinite; }
-    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(194,236,102,.6); } 70% { box-shadow: 0 0 0 8px rgba(194,236,102,0); } 100% { box-shadow: 0 0 0 0 rgba(194,236,102,0); } }
+    .toast .dot { width: 8px; height: 8px; border-radius: 50%; background: #141414; }
 
-    @media (max-width: 880px) {
-      .hero { padding: 64px 0 24px; } .hero h1 { font-size: 44px; }
-      .col-7,.col-5,.col-4,.col-8,.col-6,.col-3 { grid-column: span 12; }
-      .feat-grid { grid-template-columns: 1fr 1fr; }
-      .how-grid { grid-template-columns: 1fr; gap: 26px; }
-      .get-grid { grid-template-columns: 1fr; }
-      .band { padding: 36px 22px; border-radius: 22px; }
+    @media (max-width: 900px) {
+      .hero h1 { font-size: 52px; }
+      .intro, .two, .bento, .step-card { grid-template-columns: 1fr; }
+      .bento-row2, .steps3 { grid-template-columns: 1fr; }
+      .panel { padding: 30px 20px; border-radius: 28px; }
+      .epanel { border-radius: 30px; }
+      .cards2 { flex-direction: column; min-height: 0; }
+      .card { min-height: 300px; border-radius: 30px; }
+      .p-head h2 { font-size: 23px; }
+      .p-head .sub { font-size: 16px; }
+      .step-card { gap: 26px; }
       .nav-right a.link { display: none; }
-      .sec-head h2 { font-size: 27px; }
+      .sec-top h2, .pg-intro h2, .install h2 { font-size: 30px; }
+      .intro h2 { font-size: 30px; }
+      /* flanked rows → single column on mobile */
+      .side { display: none; }
+      .main { width: calc(100vw - 20px); padding: 20px; border-radius: 30px; }
+      .hintro { flex-direction: column; gap: 18px; }
+      .hintro h2 { width: auto; font-size: 28px; line-height: 1.08; }
+      .hintro p { font-size: 17px; line-height: 1.4; }
+      .step-row { flex-direction: column; }
+      .step-txt { width: auto; padding: 8px; }
+      .step-mock { width: 100%; height: auto; min-height: 340px; }
+      .steps-panel { border-radius: 30px; }
     }
   </style>
 </head>
 <body>
   <header>
     <div class="wrap nav">
-      <a class="brand" href="#top"><span class="mark"></span> InspectCSS</a>
+      <a class="brand" href="#top">Design.Inspect</a>
       <div class="nav-right">
         <a class="link" href="#how">How it works</a>
         <a class="link" href="#playground">Playground</a>
         <a class="link" href="#install">Install</a>
         <a class="link" href="https://github.com/abhineet00/design.inspect" target="_blank" rel="noopener">GitHub</a>
-        <button class="btn primary sm js-try" type="button">Try it on this page</button>
+        <button class="btn white sm js-try" type="button" data-label="Try Now">Try Now</button>
       </div>
     </div>
   </header>
@@ -289,191 +363,309 @@
   <main id="top">
     <section class="hero">
       <div class="wrap">
-        <span class="eyebrow"><span class="dot"></span> Open-source · built for AI-coded sites</span>
+        <span class="eyebrow"><i></i> Open-source · for sites you built with AI</span>
         <h1>Stop describing design <span class="em">to your AI.</span></h1>
-        <p class="lede">You built it with Cursor, Lovable or v0. You can see what's off — but "make the hero pop" just burns another prompt. Point at it, fix it live, and copy an exact prompt your AI applies in one shot.</p>
+        <p class="lede">You can see the padding's off and the hero falls flat but explaining it just burns another prompt. Point at the element, fix it live, and copy the exact change for your AI to apply.</p>
         <div class="hero-cta">
-          <button class="btn primary js-try" type="button">Try it on this page</button>
-          <a class="btn ghost" href="#how">See how it works</a>
-        </div>
-        <div class="hero-note">Nothing runs until you click. Then restyle anything below and grab the prompt.</div>
-        <div class="compat">
-          <span class="lead">Pairs with</span>
-          <span class="chip-ai">Cursor</span><span class="chip-ai">Claude</span><span class="chip-ai">Lovable</span><span class="chip-ai">v0</span><span class="chip-ai">Bolt</span><span class="chip-ai">Windsurf</span><span class="chip-ai">Copilot</span>
+          <button class="btn white js-try" type="button" data-label="Start editing">Start editing</button>
+          <a class="btn dark" href="#how">How it works</a>
         </div>
       </div>
     </section>
 
-    <div class="wrap">
-      <section id="how">
-        <div class="sec-head">
-          <h2>From "that looks off" to a prompt your AI ships.</h2>
-          <p>You already know what's wrong. InspectCSS turns it into instructions your AI can't misread.</p>
-        </div>
-        <div class="how-grid">
-          <div class="steps">
-            <div class="step">
-              <span class="n">1</span>
-              <div><h3>Point &amp; fix, live</h3><p>Open it on your own site — local or deployed. Click any element and drag spacing, color, type and gradients until it looks right.</p></div>
+    <div class="stack">
+      <!-- HOW IT WORKS -->
+      <div class="srow">
+        <div class="side"></div>
+        <div class="main g80" id="how">
+          <div class="hintro">
+            <h2>From that looks off to a prompt it can't misread.</h2>
+            <p>You already know what's wrong. Design.Inspect turns it into exact instructions — so your AI changes what you meant, not what it guessed.</p>
+          </div>
+          <div class="steps-panel">
+            <div class="step-row">
+              <div class="step-txt"><h3>Point &amp; fix</h3><p>Open it on your own site, local or live. Click any element and drag its spacing, type, color and gradients until it looks right.</p></div>
+              <div class="step-mock">
+                <div class="mhead"><span class="ml"><span class="dot"></span><span>Select &amp; fix</span></span><span class="pill">Edit</span></div>
+                <div class="spm">
+                  <div class="spm-top"><p>Spacing</p><img src="assets/sp-chevron.svg" alt=""></div>
+                  <div class="spm-grp">
+                    <div class="spm-set">
+                      <div>
+                        <div class="spm-sub">Padding</div>
+                        <div class="spm-flds">
+                          <div class="spm-fld"><span class="l"><img src="assets/sp-hresize.svg" alt=""><span class="v">250</span></span><span class="u">px</span></div>
+                          <div class="spm-fld"><span class="l"><img src="assets/sp-vresize.svg" alt=""><span class="v">350</span></span><span class="u">px</span></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div class="spm-sub">Margin</div>
+                        <div class="spm-flds">
+                          <div class="spm-fld"><span class="l"><img src="assets/sp-hresize2.svg" alt=""><span class="v">250</span></span><span class="u">px</span></div>
+                          <div class="spm-fld"><span class="l"><img src="assets/sp-vresize2.svg" alt=""><span class="v">350</span></span><span class="u">px</span></div>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="bxm"><span class="lab">Margin</span><span>254</span>
+                      <div class="bxm-mid"><span>254</span>
+                        <div class="bxm-pad"><span class="lab" style="left:5.64px">Padding</span><span>254</span>
+                          <div class="bxm-mid"><span>254</span>
+                            <div class="bxm-core"><span class="lab" style="left:4.93px">Size</span><span>254 x 254</span></div>
+                            <span>254</span>
+                          </div>
+                          <span>254</span>
+                        </div>
+                        <span>254</span>
+                      </div>
+                      <span>254</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="step">
-              <span class="n">2</span>
-              <div><h3>Copy the prompt</h3><p>InspectCSS writes an exact, element-by-element prompt — real selectors like <code>.hero h1</code>, real values like <code>18px</code>. Or copy clean CSS instead.</p></div>
+
+            <div class="step-row">
+              <div class="step-txt"><h3>Copy the prompt</h3><p>You get an exact, element-by-element prompt real selectors like .hero h1 , real values like 18px Prefer to paste it yourself? Copy clean CSS instead.</p></div>
+              <div class="step-mock">
+                <div class="mhead"><span class="ml"><span class="dot"></span><span>changes → AI prompt</span></span><span class="pill">Copy</span></div>
+                <div class="pmock">
+                  <div class="g1">Apply the following design changes to my<br>web page, then return the updated HTML/CSS.</div>
+                  <div class="g2">1. Element <span class="b">`.hero h1`</span>:
+   - set font-size to <span class="b">72px</span>
+   - set letter-spacing to <span class="b">-0.04em</span>
+2. Element <span class="b">`.cta .btn`</span>:
+   - set padding to <span class="b">16px 30px</span>
+   - set border-radius to <span class="b">8px</span></div>
+                  <div class="g3">Keep everything else unchanged.</div>
+                </div>
+              </div>
             </div>
-            <div class="step">
-              <span class="n">3</span>
-              <div><h3>Paste to your AI</h3><p>Drop it into Cursor, Claude, Lovable or v0. It changes the exact things you touched — nothing else — and ships the code.</p></div>
+
+            <div class="step-row">
+              <div class="step-txt"><h3>Give it to your AI</h3><p>Hand it to Cursor, Claude or v0. It applies exactly what you changed — nothing else — and writes it into your code.</p></div>
+              <div class="step-mock">
+                <div class="mhead"><span class="ml"><span class="dot"></span><span>Give to AI</span></span><span class="pill">Paste</span></div>
+                <div class="mfill">
+                  <div class="chatbox">
+                    <div class="txt">Apply the following design changes to my web page, then return the updated HTML/CSS.
+1. Element `.hero h1`:
+   - set font-size to 72px
+   - set letter-spacing to -0.04em
+2. Element `.cta .btn`:
+   - set padding to 16px 30px
+   - set border-radius to 8px
+Keep everything else unchanged.</div>
+                    <div class="chatbar"><span class="l"><img src="assets/chat-plus.svg" alt=""><span class="sq"></span></span><img src="assets/chat-send.svg" alt=""></div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="prompt-card">
-            <div class="prompt-top">
-              <span class="lbl"><i></i> changes → AI prompt</span>
-              <span class="copy">Copy for your AI</span>
+        </div>
+        <div class="side"></div>
+      </div>
+
+      <!-- CHANGES + ASSETS + HTML (flanked) -->
+      <div class="srow">
+        <div class="side"></div>
+        <div class="main g60">
+      <section class="epanel">
+        <div class="p-head">
+          <div class="htext"><h2>Changes</h2><span class="sub">Every edit you make, ready to copy</span></div>
+          <span class="p-ico"><img src="assets/icon-filediff.svg" alt=""></span>
+        </div>
+        <div class="cards2">
+          <div class="card between">
+            <div>
+              <span class="clabel"><span class="dot"></span><span>Generated CSS · Code tab</span></span>
+              <div class="pre"><pre class="mock-css"><span class="sel">.hero h1</span> {
+  <span class="prop">font-size</span>: 72px;
+  <span class="prop">letter-spacing</span>: -0.04em;
+}
+<span class="sel">.cta .btn</span> {
+  <span class="prop">padding</span>: 16px 30px;
+  <span class="prop">border-radius</span>: 8px;
+}</pre></div>
             </div>
-<pre>Apply the following design changes to my
-web page, then return the updated HTML/CSS.
-
-1. Element <span class="c">`.hero h1`</span>:
-   - set font-size to <span class="c">72px</span>
-   - set color to <span class="c">#111110</span>
-2. Element <span class="c">`.cta .btn`</span>:
-   - set padding to <span class="c">16px 30px</span>
-   - set border-radius to <span class="c">999px</span>
-   - set background to <span class="c">#c2ec66</span>
-
-<span class="m">Keep everything else unchanged.</span></pre>
+            <div class="card-foot"><span class="ft">Real selectors · no !important</span><span class="copy-pill">Copy CSS</span></div>
+          </div>
+          <div class="card between">
+            <div>
+              <span class="clabel"><span>Change log</span></span>
+              <div class="logx">
+                <div class="r"><span class="sel">.hero h1</span><span class="prop">font-size</span><span class="val">64 → 72px</span></div>
+                <div class="r"><span class="sel">.hero h1</span><span class="prop">letter-spacing</span><span class="val">−0.02 → −0.04em</span></div>
+                <div class="r"><span class="sel">.cta .btn</span><span class="prop">padding</span><span class="val">12px → 16px 30px</span></div>
+                <div class="r"><span class="sel">.card</span><span class="prop">border-radius</span><span class="val">16 → 8px</span></div>
+              </div>
+            </div>
+            <div class="card-foot plain">Every edit, in order — grouped per element to build the prompt.</div>
           </div>
         </div>
       </section>
 
-      <section id="playground" style="padding-top: 24px;">
-        <div class="sec-head">
-          <h2>Try it on this very page.</h2>
-          <p>Hit <b>Try it</b>, reshape anything below, then open <b>Changes</b> and copy the prompt.</p>
+      <!-- ASSETS -->
+      <section class="epanel">
+        <div class="p-head">
+          <div class="htext"><h2>Assets</h2><span class="sub">Every edit you make, ready to copy</span></div>
+          <span class="p-ico"><img src="assets/icon-component.svg" alt=""></span>
+        </div>
+        <div class="cards2">
+          <div class="card g32">
+            <div>
+              <span class="clabel"><span class="dot"></span><span>Colors</span></span>
+              <div class="sw"><i style="background:#111"></i><i style="background:#444"></i><i style="background:#777"></i><i style="background:#aaa"></i><i style="background:#dcdcdc"></i><i style="background:#f2f2f2"></i></div>
+            </div>
+            <div>
+              <span class="clabel"><span class="dot"></span><span>Typography</span></span>
+              <div class="pre"><pre class="mock-css"><span class="sel">.hero h1</span> {
+  <span class="prop">font-size</span>: 72px;
+  <span class="prop">letter-spacing</span>: -0.04em;
+}
+<span class="sel">.cta .btn</span> {
+  <span class="prop">padding</span>: 16px 30px;
+  <span class="prop">border-radius</span>: 8px;
+}</pre></div>
+            </div>
+          </div>
+          <div class="card g32">
+            <div>
+              <span class="clabel"><span class="dot"></span><span>SVGs</span></span>
+              <div class="sw"><i style="background:#111"></i><i style="background:#444"></i><i style="background:#777"></i><i style="background:#aaa"></i><i style="background:#dcdcdc"></i><i style="background:#f2f2f2"></i></div>
+            </div>
+            <div>
+              <span class="clabel"><span class="dot"></span><span>Media</span></span>
+              <div class="pre"><pre class="mock-css"><span class="sel">.hero h1</span> {
+  <span class="prop">font-size</span>: 72px;
+  <span class="prop">letter-spacing</span>: -0.04em;
+}
+<span class="sel">.cta .btn</span> {
+  <span class="prop">padding</span>: 16px 30px;
+  <span class="prop">border-radius</span>: 8px;
+}</pre></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- HTML NAVIGATOR -->
+      <section class="epanel">
+        <div class="p-head">
+          <div class="htext"><h2>HTML navigator</h2><span class="sub">Every edit you make, ready to copy</span></div>
+          <span class="p-ico"><img src="assets/icon-html.svg" alt=""></span>
+        </div>
+        <div class="cards2">
+          <div class="card">
+            <span class="clabel"><span class="dot"></span><span>Generated CSS · Code tab</span></span>
+            <div class="tree">
+              <div class="r" style="padding-left:4px"><span class="tw">▾</span> &lt;<span class="t">html</span> <span class="a">lang</span>=<span class="v">"en"</span>&gt;</div>
+              <div class="r" style="padding-left:20px">&nbsp;&nbsp;&lt;<span class="t">plasmo-csui</span>&gt;</div>
+              <div class="r" style="padding-left:20px"><span class="tw">▸</span> &lt;<span class="t">head</span>&gt; <span class="e">…</span> &lt;/<span class="t">head</span>&gt;</div>
+              <div class="r" style="padding-left:20px"><span class="tw">▾</span> &lt;<span class="t">body</span>&gt;</div>
+              <div class="r" style="padding-left:36px"><span class="tw">▸</span> &lt;<span class="t">header</span>&gt; <span class="e">…</span> &lt;/<span class="t">header</span>&gt;</div>
+              <div class="r" style="padding-left:36px"><span class="tw">▾</span> &lt;<span class="t">main</span> <span class="a">id</span>=<span class="v">"top"</span>&gt;</div>
+              <div class="r" style="padding-left:52px"><span class="tw">▾</span> &lt;<span class="t">section</span> <span class="a">class</span>=<span class="v">"hero"</span>&gt;</div>
+              <div class="r" style="padding-left:68px"><span class="tw">▾</span> &lt;<span class="t">div</span> <span class="a">class</span>=<span class="v">"wrap"</span>&gt;</div>
+              <div class="r" style="padding-left:84px"><span class="tw">▸</span> &lt;<span class="t">span</span> <span class="a">class</span>=<span class="v">"eyebrow"</span>&gt; <span class="e">…</span> &lt;/<span class="t">span</span>&gt;</div>
+              <div class="r" style="padding-left:84px"><span class="tw">▸</span> &lt;<span class="t">h1</span>&gt; <span class="e">…</span> &lt;/<span class="t">h1</span>&gt;</div>
+              <div class="r" style="padding-left:84px">&nbsp;&nbsp;&lt;<span class="t">p</span> <span class="a">class</span>=<span class="v">"lede"</span>&gt;</div>
+              <div class="r" style="padding-left:84px"><span class="tw">▸</span> &lt;<span class="t">div</span> <span class="a">class</span>=<span class="v">"hero-cta"</span>&gt; <span class="e">…</span> &lt;/<span class="t">div</span>&gt;</div>
+              <div class="r" style="padding-left:84px">&nbsp;&nbsp;&lt;<span class="t">div</span> <span class="a">class</span>=<span class="v">"hero-note"</span>&gt;</div>
+              <div class="r" style="padding-left:84px"><span class="tw">▸</span> &lt;<span class="t">div</span> <span class="a">class</span>=<span class="v">"compat"</span>&gt; <span class="e">…</span> &lt;/<span class="t">div</span>&gt;</div>
+              <div class="r" style="padding-left:68px">&nbsp;&nbsp;&lt;/<span class="t">div</span>&gt;</div>
+              <div class="r" style="padding-left:52px">&nbsp;&nbsp;&lt;/<span class="t">section</span>&gt;</div>
+            </div>
+          </div>
+          <div class="card between">
+            <div>
+              <span class="clabel"><span class="dot"></span><span>Pseudo states</span></span>
+              <p class="pstate-desc">Style <code>:hover</code>, <code>:focus</code> and <code>:active</code> — not just the default.</p>
+              <div class="pchips2"><span class="on">:hover</span><span>:focus</span><span>:active</span></div>
+            </div>
+            <div class="card-foot plain">Every edit, in order — grouped per element to build the prompt.</div>
+          </div>
+        </div>
+      </section>
+        </div>
+        <div class="side"></div>
+      </div>
+
+      <!-- PLAYGROUND (flanked) -->
+      <div class="srow">
+        <div class="side"></div>
+        <div class="main" id="playground">
+        <div class="pg-intro">
+          <span class="eyebrow">Playground</span>
+          <h2>Try it on.</h2>
+          <p>Hit <b>Try Now</b>, reshape anything below, then open <b>Changes</b> and copy the prompt.</p>
         </div>
         <div class="canvas">
-          <div class="canvas-bar">
-            <i></i><i></i><i></i>
-            <span class="label">playground — restyle any block, then grab the AI prompt</span>
+          <div class="bento">
+            <div class="pg-card tall"><span class="mlabel"><i></i> Gradient</span></div>
+            <div class="pg-card tall image"><span class="wm">Design.Inspect</span><span class="mlabel"><i></i> Image</span></div>
           </div>
-          <div class="play-grid">
-            <div class="cell col-7">
-              <span class="tag">Gradient</span>
-              <div class="banner">
-                <h3>Editable gradient</h3>
-                <p>A real <code>linear-gradient</code> — select it and change the angle or stops.</p>
-              </div>
-            </div>
-            <div class="cell col-5">
-              <span class="tag">Fills</span>
-              <div class="swatches">
-                <div class="chip a"></div><div class="chip b"></div><div class="chip c"></div><div class="chip d"></div><div class="chip e"></div>
-              </div>
-              <p style="color:var(--ink-2); font-size:13.5px; margin-top:14px;">Solids, gradients, even a conic — all live-editable fills.</p>
-            </div>
-            <div class="cell col-4">
-              <span class="tag">Buttons</span>
-              <div class="btn-samples">
-                <button class="s-btn fill">Primary</button>
-                <button class="s-btn lime">Accent</button>
-                <button class="s-btn out">Outline</button>
-                <button class="s-btn pill">Pill</button>
-              </div>
-            </div>
-            <div class="cell col-4">
-              <span class="tag">Type</span>
-              <div class="specimen">
-                <h3>Ag<span class="g">.</span></h3>
-                <div class="row"><span class="badge">Weight</span><span class="badge">Tracking</span><span class="badge">Font</span></div>
-              </div>
-            </div>
-            <div class="cell col-4">
-              <span class="tag">Pricing</span>
-              <div class="price">
-                <div class="amt">$0<span> / forever</span></div>
-                <ul><li>Unlimited elements</li><li>Copy real CSS</li><li>AI prompt export</li></ul>
-              </div>
-            </div>
+          <div class="bento-row2">
+            <div class="pg-card small"><span class="mlabel"><i></i> Typography</span></div>
+            <div class="pg-card small"><span class="mlabel"><i></i> Layout</span></div>
+            <div class="pg-card small"><span class="mlabel"><i></i> Spacing</span></div>
           </div>
         </div>
       </section>
+        </div>
+        <div class="side"></div>
+      </div>
 
-      <section id="features">
-        <div class="sec-head">
-          <h2>Precise where prompts are vague.</h2>
-          <p>Your AI guesses from words. InspectCSS hands it exact elements and exact numbers.</p>
-        </div>
-        <div class="feat-grid">
-          <div class="feat">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#14140f" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="4"/><path d="M3 9h18M9 3v18"/></svg></div>
-            <h3>Exact selectors</h3>
-            <p>Every change is pinned to a real selector like <code>.hero h1</code> — never "the big heading."</p>
+      <!-- INSTALL (flanked) -->
+      <div class="srow">
+        <div class="side"></div>
+        <div class="main install" id="install">
+        <span class="eyebrow">Bookmarklet</span>
+        <h2>Free forever. On every site you build.</h2>
+        <p>No store fees, no review queue. Drag a button to your bookmarks bar and you're good to go.</p>
+        <div class="steps3-title">Get it Now in 3 Steps</div>
+        <div class="steps3">
+          <div class="s3">
+            <div class="s3-body"><span class="kbds"><span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">B</span></span></div>
+            <div class="s3-cap">Show the bookmarks bar</div>
           </div>
-          <div class="feat">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#14140f" stroke-width="1.7"><path d="M4 20l4-1 9-9-3-3-9 9-1 4z"/><path d="M13 5l3 3"/></svg></div>
-            <h3>Real values</h3>
-            <p>Drag till it looks right; your AI gets <code>padding: 18px 28px</code>, not "a bit more room."</p>
-          </div>
-          <div class="feat">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#14140f" stroke-width="1.7"><path d="M4 17l6-6-6-6M12 19h8"/></svg></div>
-            <h3>Runs on localhost</h3>
-            <p>Point it at your dev server or a deployed preview — no import, no build, no code changes.</p>
-          </div>
-          <div class="feat">
-            <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="#14140f" stroke-width="1.7"><path d="M8 4h9a3 3 0 013 3v11"/><rect x="4" y="8" width="12" height="12" rx="3"/></svg></div>
-            <h3>Prompt or CSS</h3>
-            <p>Copy a ready-made prompt for your AI — or clean, first-class CSS to paste yourself.</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="install" style="padding-top: 20px;">
-        <div class="band">
-          <div class="sec-head">
-            <h2>Free forever. On every site you build.</h2>
-            <p>No store fee, no extension review. Drag a button to your bookmarks bar and click it on any page — your <code>localhost</code> dev server and live sites alike.</p>
-          </div>
-          <div class="get-grid">
-            <div class="get-card">
-              <span class="k">Bookmarklet <span class="badge-soft rec">Recommended</span></span>
-              <h3>Always up to date</h3>
-              <p>Loads the latest InspectCSS on demand. Works on most sites and your dev server.</p>
-              <div class="spacer"></div>
-              <a class="mark-btn primary" id="loaderMark" draggable="true" onclick="return false;"
-                 href="javascript:(function(){if(window.InspectCSS){window.InspectCSS.destroy();return;}var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js';s.setAttribute('data-inspect-ui','');(document.body||document.documentElement).appendChild(s);})();"><span class="grip">⣿</span> InspectCSS</a>
-              <div class="get-hint">Drag me to your bookmarks bar. <a id="copyLoader">Copy code</a></div>
+          <div class="s3">
+            <div class="s3-body">
+              <a class="mark-btn" id="loaderMark" draggable="true" onclick="return false;"
+                 href="javascript:(function(){if(window.InspectCSS){window.InspectCSS.destroy();return;}var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js';s.setAttribute('data-inspect-ui','');(document.body||document.documentElement).appendChild(s);})();"><span class="grip">⣿</span> Design.Inspect</a>
             </div>
-            <div class="get-card">
-              <span class="k">Offline <span class="badge-soft strict">Strict sites</span></span>
-              <h3>Self-contained</h3>
-              <p>The whole tool lives in the bookmark, so it runs on locked-down sites too.</p>
-              <div class="spacer"></div>
-              <a class="mark-btn alt loading" id="inlineMark" draggable="true" onclick="return false;" href="javascript:void(0)"><span class="grip">⣿</span> InspectCSS · offline</a>
-              <div class="get-hint"><span id="inlineState">Preparing…</span> · <a id="copyInline">Copy code</a></div>
-            </div>
+            <div class="s3-cap">Drag this button onto it</div>
           </div>
-          <div class="get-steps">
-            <div><b>1</b> Show the bookmarks bar — <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">B</span></div>
-            <div><b>2</b> Drag a button onto it</div>
-            <div><b>3</b> Click it on any site — click again to close</div>
+          <div class="s3">
+            <div class="s3-body"><span class="s3-done">Done! Try it</span></div>
+            <div class="s3-cap">Done! Click it on any site</div>
           </div>
         </div>
-      </section>
+        </div>
+        <div class="side"></div>
+      </div>
     </div>
   </main>
 
   <footer>
-    <div class="wrap foot">
-      <span>InspectCSS — free &amp; open-source. Stop explaining design to your AI.</span>
-      <span><a href="https://github.com/abhineet00/design.inspect" target="_blank" rel="noopener">GitHub</a> · <a href="#install">Install</a> · <a href="#top">Top</a></span>
+    <div class="wrap">
+      <div class="foot-top">
+        <a class="foot-made" href="https://github.com/abhineet00" target="_blank" rel="noopener">Made by abhineet →</a>
+        <div class="foot-social">
+          <a href="https://x.com" target="_blank" rel="noopener" aria-label="X"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.5 8.6L23 22h-6.8l-5-6.6L5.5 22H2.4l8-9.2L1.5 2h6.9l4.5 6 5.9-6zm-2.4 18h1.9L7.6 4H5.6l10.9 16z"/></svg></a>
+          <a href="https://linkedin.com" target="_blank" rel="noopener" aria-label="LinkedIn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M4.98 3.5a2.5 2.5 0 11-.02 5 2.5 2.5 0 01.02-5zM3 9h4v12H3zM10 9h3.8v1.7h.1c.5-.9 1.8-1.9 3.6-1.9 3.9 0 4.6 2.5 4.6 5.8V21h-4v-5.2c0-1.2 0-2.8-1.7-2.8s-2 1.4-2 2.7V21h-4z"/></svg></a>
+          <a href="https://github.com/abhineet00/design.inspect" target="_blank" rel="noopener" aria-label="GitHub"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.2-1.1-1.5-1.1-1.5-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.4-2.2-.2-4.6-1.1-4.6-4.9 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.6 0 0 .8-.3 2.7 1a9.3 9.3 0 015 0c1.9-1.3 2.7-1 2.7-1 .5 1.3.2 2.3.1 2.6.6.7 1 1.6 1 2.7 0 3.8-2.4 4.7-4.6 4.9.3.3.7 1 .7 2v2.9c0 .3.2.6.7.5A10 10 0 0012 2z"/></svg></a>
+          <a href="mailto:gtserings078@gmail.com" aria-label="Email"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg></a>
+        </div>
+      </div>
+      <div class="wordmark">Design.Inspect</div>
     </div>
   </footer>
 
-  <div class="toast" id="toast"><span class="dot"></span> <span id="toastMsg">Editing on — point at any element and click.</span></div>
+  <div class="toast" id="toast"><span class="dot"></span> <span id="toastMsg">Editing on — click any element to select it.</span></div>
 
   <script>
     (function () {
-      /* ---- Activate the editor only on demand (Try it) ---- */
+      /* ---- Activate the editor only on demand ---- */
       const toast = document.getElementById('toast');
       const toastMsg = document.getElementById('toastMsg');
       let toastTimer;
@@ -485,104 +677,55 @@ web page, then return the updated HTML/CSS.
       function syncButtons() {
         const on = !!window.InspectCSS;
         tryButtons().forEach((b) => {
-          b.textContent = on ? 'Stop editing' : 'Try it on this page';
+          b.textContent = on ? 'Stop editing' : (b.dataset.label || 'Try it');
           b.classList.toggle('active-state', on);
         });
       }
       function activate() {
-        if (window.InspectCSS) { window.InspectCSS.destroy(); syncButtons(); showToast('Editing off.'); return; }
+        if (window.InspectCSS) { window.InspectCSS.destroy(); syncButtons(); showToast('Editing off. Nothing changed on the page.'); return; }
         const s = document.createElement('script');
         s.src = '../dist/inspect.js';
         s.setAttribute('data-inspect-ui', '');
-        s.onload = () => { syncButtons(); showToast('Editing on — point at any element and click.'); };
+        s.onload = () => { syncButtons(); showToast('Editing on — click any element to select it.'); };
         document.body.appendChild(s);
       }
-      // Tag the control buttons as tool UI so that, once picking is active, the
-      // inspector ignores clicks on them and our toggle handler still runs.
       tryButtons().forEach((b) => { b.setAttribute('data-inspect-ui', ''); b.addEventListener('click', activate); });
 
-      /* ---- Ambient inspector surface on the playground ---- *
-       * A passive tease of the real tool: as the cursor moves over the canvas a
-       * crosshair tracks it, the element underneath gets a highlight box, and a
-       * live W×H badge appears. No editing — clicking "Try it" hands over to the
-       * real inspector, at which point this surface steps aside.                */
+      /* ---- Ambient inspector surface on the playground ---- */
       (function () {
-        const canvas = document.querySelector('#playground .canvas');
-        // Pointer-only: skip on touch, where a tracked crosshair makes no sense.
-        if (!canvas || !window.matchMedia('(hover: hover)').matches) return;
-
+        const host = document.querySelector('#playground .canvas');
+        if (!host || !window.matchMedia('(hover: hover)').matches) return;
         const surface = document.createElement('div');
         surface.className = 'inspect-surface';
-        surface.setAttribute('data-inspect-ui', ''); // real tool ignores our overlay
-        surface.innerHTML =
-          '<div class="xhair v"></div><div class="xhair h"></div>' +
-          '<div class="hit-box"></div><div class="dim-badge"></div><div class="coord"></div>';
-        canvas.appendChild(surface);
-        const v = surface.querySelector('.xhair.v');
-        const h = surface.querySelector('.xhair.h');
-        const box = surface.querySelector('.hit-box');
-        const badge = surface.querySelector('.dim-badge');
-        const coord = surface.querySelector('.coord');
+        surface.setAttribute('data-inspect-ui', '');
+        surface.innerHTML = '<div class="xhair v"></div><div class="xhair h"></div><div class="hit-box"></div><div class="dim-badge"></div>';
+        host.appendChild(surface);
+        const v = surface.querySelector('.xhair.v'), h = surface.querySelector('.xhair.h');
+        const box = surface.querySelector('.hit-box'), badge = surface.querySelector('.dim-badge');
         let raf = 0, last = null;
-
         function draw() {
-          raf = 0;
-          if (!last) return;
-          if (window.InspectCSS) { surface.classList.remove('on'); return; } // real tool takes over
-          const cr = canvas.getBoundingClientRect();
+          raf = 0; if (!last) return;
+          if (window.InspectCSS) { surface.classList.remove('on'); return; }
+          const cr = host.getBoundingClientRect();
           const x = last.clientX - cr.left, y = last.clientY - cr.top;
           surface.classList.add('on');
           v.style.transform = 'translateX(' + x + 'px)';
           h.style.transform = 'translateY(' + y + 'px)';
-          coord.textContent = Math.round(x) + ', ' + Math.round(y);
-          coord.style.left = Math.min(x + 12, cr.width - 66) + 'px';
-          coord.style.top = Math.min(y + 12, cr.height - 22) + 'px';
-
-          // Deepest element under the cursor (our overlay is pointer-events:none,
-          // so it's skipped) — mirrors how the real inspector picks a target.
           const el = document.elementFromPoint(last.clientX, last.clientY);
-          if (!el || el === canvas || surface.contains(el) || !canvas.contains(el)) {
-            box.style.opacity = 0; badge.style.opacity = 0; return;
-          }
+          const big = el && (el.getBoundingClientRect().width * el.getBoundingClientRect().height) > 0.82 * cr.width * cr.height;
+          if (!el || el === host || surface.contains(el) || !host.contains(el) || big) { box.style.opacity = 0; badge.style.opacity = 0; return; }
           const er = el.getBoundingClientRect();
           const bx = er.left - cr.left, by = er.top - cr.top;
           box.style.opacity = 1; badge.style.opacity = 1;
-          box.style.left = bx + 'px'; box.style.top = by + 'px';
-          box.style.width = er.width + 'px'; box.style.height = er.height + 'px';
+          box.style.left = bx + 'px'; box.style.top = by + 'px'; box.style.width = er.width + 'px'; box.style.height = er.height + 'px';
           badge.textContent = Math.round(er.width) + ' × ' + Math.round(er.height);
-          let top = by - 22; if (top < 2) top = by + er.height + 6; // flip below near the top edge
+          let top = by - 22; if (top < 2) top = by + er.height + 6;
           badge.style.left = Math.max(2, Math.min(bx, cr.width - badge.offsetWidth - 2)) + 'px';
           badge.style.top = top + 'px';
         }
-        canvas.addEventListener('mousemove', (e) => { last = e; if (!raf) raf = requestAnimationFrame(draw); });
-        canvas.addEventListener('mouseleave', () => {
-          last = null; surface.classList.remove('on'); box.style.opacity = 0; badge.style.opacity = 0;
-        });
+        host.addEventListener('mousemove', (e) => { last = e; if (!raf) raf = requestAnimationFrame(draw); });
+        host.addEventListener('mouseleave', () => { last = null; surface.classList.remove('on'); box.style.opacity = 0; badge.style.opacity = 0; });
       })();
-
-      /* ---- Build the offline bookmarklet + wire copy links ---- */
-      const CDN = 'https://cdn.jsdelivr.net/gh/abhineet00/design.inspect@master/dist/inspect.min.js';
-      const inlineMark = document.getElementById('inlineMark');
-      const inlineState = document.getElementById('inlineState');
-      function build(code) {
-        inlineMark.setAttribute('href', 'javascript:' + encodeURIComponent(code + '\n;void 0;'));
-        inlineMark.classList.remove('loading');
-        inlineState.textContent = 'Ready — drag me up.';
-      }
-      fetch('../dist/inspect.min.js').then((r) => { if (!r.ok) throw 0; return r.text(); }).then(build)
-        .catch(() => fetch(CDN).then((r) => r.text()).then(build)
-          .catch(() => { inlineState.textContent = 'Offline build unavailable.'; }));
-
-      function copyFrom(el, link) {
-        link.addEventListener('click', (e) => {
-          e.preventDefault();
-          const code = el.getAttribute('href') || '';
-          if (!code || code === 'javascript:void(0)') return;
-          navigator.clipboard.writeText(code).then(() => { const o = link.textContent; link.textContent = 'Copied ✓'; setTimeout(() => (link.textContent = o), 1500); });
-        });
-      }
-      copyFrom(document.getElementById('loaderMark'), document.getElementById('copyLoader'));
-      copyFrom(inlineMark, document.getElementById('copyInline'));
     })();
   </script>
 </body>

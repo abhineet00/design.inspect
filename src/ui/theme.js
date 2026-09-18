@@ -57,6 +57,7 @@ ${fontFace}
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6);
   display: flex; flex-direction: column;
   overflow: hidden;
+  padding: 2px;
   z-index: 2147483646;
 }
 .panel.hidden { display: none; }
@@ -65,19 +66,21 @@ ${fontFace}
   top: 0; right: 0; bottom: 0; width: 330px; max-height: 100vh; height: 100vh;
   border-radius: 0; border-left: 1px solid var(--tool-border);
   box-shadow: -12px 0 40px rgba(0,0,0,0.5);
+  padding: 0;
 }
 .panel.docked .head { cursor: default; }
 .panel.docked .panel-body { border-radius: 0; }
 
 /* The properties body is a distinct darker card nested under the header, so the
    lighter panel colour frames it at the top — the divided top/bottom look. */
-.panel-body { background: var(--body-bg); border-radius: 22px 22px 0 0; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
+.panel-body { background: var(--body-bg); border-radius: 22px 22px 26px 26px; padding: 10px 14px 14px; overflow-y: auto; overflow-x: hidden; scrollbar-gutter: stable; }
 
 /* Scrollbars everywhere in our UI follow the design language (never the OS
    default white). scrollbar-gutter above keeps the body width stable when a
    section opens/closes, so nothing jumps. */
 .wrap, .wrap * { scrollbar-width: thin; scrollbar-color: #333333 transparent; }
 .wrap ::-webkit-scrollbar { width: 9px; height: 9px; }
+.wrap ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
 .wrap ::-webkit-scrollbar-track { background: transparent; }
 .wrap ::-webkit-scrollbar-thumb { background: #333333; border-radius: 9px; border: 2px solid transparent; background-clip: padding-box; }
 .wrap ::-webkit-scrollbar-thumb:hover { background: #444444; }
